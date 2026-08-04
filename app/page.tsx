@@ -27,6 +27,8 @@ import {
   ShieldCheck,
   Storefront,
 } from "./icons";
+import { AccountPanel } from "./AccountPanel";
+import { useAccount } from "./useAccount";
 
 type SongType = "gift" | "business" | "graduation";
 type OrderStatus = "idle" | "sending" | "ready" | "error";
@@ -228,9 +230,11 @@ function formatReset(value: string | null | undefined) {
 }
 
 export default function Home() {
+  const account = useAccount();
   const [step, setStep] = useState(0);
   const [order, setOrder] = useState<OrderPayload>(initialOrder);
   const [status, setStatus] = useState<OrderStatus>("idle");
+  const [orderError, setOrderError] = useState<string | null>(null);
   const [result, setResult] = useState<ApiResult | null>(null);
   const [credits, setCredits] = useState<CreditsInfo | null>(null);
   const [creditsStatus, setCreditsStatus] = useState<"loading" | "ready" | "error">("loading");
@@ -286,13 +290,26 @@ export default function Home() {
     event.preventDefault();
     setStatus("sending");
     setResult(null);
+    setOrderError(null);
 
     try {
+      const headers: Record<string, string> = { "Content-Type": "application/json" };
+
+      if (account.session?.access_token) {
+        headers.Authorization = `Bearer ${account.session.access_token}`;
+      }
+
       const response = await fetch("/api/orders", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers,
         body: JSON.stringify(order),
       });
+
+      if (response.status === 402) {
+        setOrderError("נגמרו לך הקרדיטים. אפשר להירשם לחבילה נוספת או לרכוש קרדיטים.");
+        setStatus("error");
+        return;
+      }
 
       if (!response.ok) {
         throw new Error("Order request failed");
@@ -303,7 +320,9 @@ export default function Home() {
       setStatus("ready");
       setStep(2);
       void refreshCredits();
+      void account.refreshCredits();
     } catch {
+      setOrderError("לא הצלחנו לשלוח כרגע. אפשר לבדוק חיבור API ולנסות שוב.");
       setStatus("error");
     }
   };
@@ -324,8 +343,9 @@ export default function Home() {
         </div>
 
         <div className="topbar-end">
-          <div className="credit-pill" aria-live="polite">
-            <span>קרדיטים:</span>
+          <AccountPanel account={account} />
+          <div className="credit-pill" aria-live="polite" title="מלאי הפקה מול ElevenLabs">
+            <span>מלאי:</span>
             <strong>
               {creditsStatus === "loading"
                 ? "בודק..."
@@ -334,7 +354,7 @@ export default function Home() {
                   : formatNumber(credits?.remaining)}
             </strong>
             <Coin size={16} className="coin-icon" />
-            <button type="button" onClick={refreshCredits} aria-label="רענון קרדיטים">
+            <button type="button" onClick={refreshCredits} aria-label="רענון מלאי">
               <Refresh size={13} />
             </button>
           </div>
@@ -720,9 +740,7 @@ export default function Home() {
                 {status === "sending" ? "שולח להזמנה" : "הדמיית הזמנה ב־30 ש\"ח"}
               </button>
 
-              {status === "error" && (
-                <p className="status-message error">לא הצלחנו לשלוח כרגע. אפשר לבדוק חיבור API ולנסות שוב.</p>
-              )}
+              {status === "error" && orderError && <p className="status-message error">{orderError}</p>}
 
               {result && (
                 <div className="api-result">

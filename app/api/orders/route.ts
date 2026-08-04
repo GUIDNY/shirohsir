@@ -1,4 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
+import { getUserFromRequest } from "@/lib/auth-user";
+import { createServerClient } from "@/lib/supabase-server";
+
+const ORDER_CREDITS_COST = 1;
 
 type OrderPayload = {
   songType?: string;
@@ -406,6 +410,41 @@ async function createElevenLabsSong(order: OrderPayload): Promise<OrderResponse>
   };
 }
 
+async function persistOrder(
+  supabase: ReturnType<typeof createServerClient>,
+  userId: string,
+  order: OrderPayload,
+  response: OrderResponse,
+) {
+  const { error } = await supabase.from("orders").insert({
+    user_id: userId,
+    song_type: order.songType,
+    recipient: text(order.recipient),
+    occasion: text(order.occasion),
+    style: text(order.style),
+    mood: text(order.mood),
+    vocalist: text(order.vocalist),
+    language_register: text(order.languageRegister),
+    lyric_structure: text(order.lyricStructure),
+    pronunciation: text(order.pronunciation),
+    story: text(order.story),
+    must_include: text(order.mustInclude),
+    avoid: text(order.avoid),
+    customer_name: text(order.customerName),
+    customer_email: text(order.email),
+    customer_phone: text(order.phone),
+    status: response.audioDataUrl ? "delivered" : "lyrics_ready",
+    provider: response.provider,
+    provider_order_id: response.orderId,
+    prompt_preview: response.promptPreview,
+    credits_cost: ORDER_CREDITS_COST,
+  });
+
+  if (error) {
+    console.error("Failed to persist order:", error.message);
+  }
+}
+
 export async function POST(request: NextRequest) {
   const order = (await request.json()) as OrderPayload;
   const missing = requiredFields.filter((field) => !text(order[field]));
@@ -417,8 +456,50 @@ export async function POST(request: NextRequest) {
     );
   }
 
+  const user = await getUserFromRequest(request);
+  const supabase = user ? createServerClient() : null;
+
   try {
-    const response = await createElevenLabsSong(order);
+    if (user && supabase) {
+      const { error: spendError } = await supabase.rpc("spend_credits", {
+        p_user_id: user.id,
+        p_amount: ORDER_CREDITS_COST,
+        p_reason: "order_spend",
+      });
+
+      if (spendError) {
+        if (spendError.message.includes("insufficient_credits")) {
+          return NextResponse.json(
+            { error: "אין מספיק קרדיטים ליצירת שיר נוסף", code: "insufficient_credits" },
+            { status: 402 },
+          );
+        }
+
+        throw spendError;
+      }
+    }
+
+    let response: OrderResponse;
+
+    try {
+      response = await createElevenLabsSong(order);
+    } catch (generationError) {
+      if (user && supabase) {
+        // Generation failed after the credit was already spent — refund it.
+        await supabase.rpc("spend_credits", {
+          p_user_id: user.id,
+          p_amount: -ORDER_CREDITS_COST,
+          p_reason: "refund",
+          p_note: "generation failed",
+        });
+      }
+
+      throw generationError;
+    }
+
+    if (user && supabase) {
+      await persistOrder(supabase, user.id, order, response);
+    }
 
     return NextResponse.json(response);
   } catch (error) {
