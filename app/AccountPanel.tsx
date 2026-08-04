@@ -4,6 +4,7 @@ import { FormEvent, useState } from "react";
 import { useAccount } from "./useAccount";
 import { Loader } from "./icons";
 import { BillingModal } from "./BillingModal";
+import { MySongsModal } from "./MySongsModal";
 
 type Mode = "signIn" | "signUp";
 
@@ -114,6 +115,7 @@ export function AccountPanel({ account }: { account: ReturnType<typeof useAccoun
   const [submitting, setSubmitting] = useState(false);
   const [confirmationSent, setConfirmationSent] = useState(false);
   const [billingOpen, setBillingOpen] = useState(false);
+  const [songsOpen, setSongsOpen] = useState(false);
 
   const submit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -153,6 +155,9 @@ export function AccountPanel({ account }: { account: ReturnType<typeof useAccoun
             {creditsLoading ? "…" : credits?.isAdmin ? "∞ מנהל" : `${credits?.balance ?? 0} קרדיטים`}
           </span>
         </div>
+        <button className="account-buy" type="button" onClick={() => setSongsOpen(true)}>
+          השירים שלי
+        </button>
         {!credits?.isAdmin && (
           <button className="account-buy" type="button" onClick={() => setBillingOpen(true)}>
             רכישת קרדיטים
@@ -163,6 +168,7 @@ export function AccountPanel({ account }: { account: ReturnType<typeof useAccoun
         </button>
         {!credits?.isAdmin && <ReferralBox account={account} />}
         {billingOpen && <BillingModal account={account} onClose={() => setBillingOpen(false)} />}
+        {songsOpen && <MySongsModal account={account} onClose={() => setSongsOpen(false)} />}
       </div>
     );
   }

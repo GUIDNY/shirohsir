@@ -483,6 +483,41 @@ async function createElevenLabsSong(order: OrderPayload, songSeconds: number): P
   };
 }
 
+async function uploadSongAudio(
+  supabase: ReturnType<typeof createServerClient>,
+  userId: string,
+  orderId: string,
+  audioDataUrl: string,
+  contentType: string,
+): Promise<string | null> {
+  try {
+    const base64 = audioDataUrl.split(",")[1];
+
+    if (!base64) {
+      return null;
+    }
+
+    const bytes = Buffer.from(base64, "base64");
+    const extension = contentType.includes("wav") ? "wav" : "mp3";
+    const path = `${userId}/${orderId}.${extension}`;
+
+    const { error } = await supabase.storage.from("songs").upload(path, bytes, {
+      contentType,
+      upsert: true,
+    });
+
+    if (error) {
+      console.error("Failed to upload song audio:", error.message);
+      return null;
+    }
+
+    return path;
+  } catch (error) {
+    console.error("Failed to upload song audio:", error instanceof Error ? error.message : error);
+    return null;
+  }
+}
+
 async function persistOrder(
   supabase: ReturnType<typeof createServerClient>,
   userId: string,
@@ -490,6 +525,7 @@ async function persistOrder(
   response: OrderResponse,
   songSeconds: number,
   creditsCost: number,
+  audioPath: string | null,
 ) {
   const { error } = await supabase.from("orders").insert({
     user_id: userId,
@@ -514,6 +550,7 @@ async function persistOrder(
     prompt_preview: response.promptPreview,
     song_length_seconds: songSeconds,
     credits_cost: creditsCost,
+    audio_url: audioPath,
   });
 
   if (error) {
@@ -577,7 +614,12 @@ export async function POST(request: NextRequest) {
     }
 
     if (user && supabase) {
-      await persistOrder(supabase, user.id, order, response, songSeconds, admin ? 0 : creditsCost);
+      const audioPath =
+        response.audioDataUrl && response.audioContentType
+          ? await uploadSongAudio(supabase, user.id, response.orderId, response.audioDataUrl, response.audioContentType)
+          : null;
+
+      await persistOrder(supabase, user.id, order, response, songSeconds, admin ? 0 : creditsCost, audioPath);
     }
 
     return NextResponse.json(response);

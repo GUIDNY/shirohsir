@@ -675,6 +675,109 @@ a {
   opacity: 0.7;
 }
 
+/* ---- my songs modal ---- */
+
+.songs-modal {
+  width: min(640px, 100%);
+}
+
+.songs-loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: 40px 0;
+  color: var(--brown-800);
+}
+
+.songs-empty {
+  padding: 30px 0;
+  color: var(--brown-800);
+  text-align: center;
+  opacity: 0.75;
+}
+
+.songs-list {
+  display: grid;
+  gap: 14px;
+}
+
+.song-card {
+  padding: 18px;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  background: var(--cream-100);
+}
+
+.song-card-heading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+
+.song-card-heading strong {
+  display: block;
+  font-size: 1.02rem;
+}
+
+.song-card-heading span {
+  display: block;
+  margin-top: 2px;
+  color: var(--brown-800);
+  font-size: 0.82rem;
+  opacity: 0.75;
+}
+
+.song-card-date {
+  color: var(--brown-800);
+  font-family: ui-monospace, "SFMono-Regular", Menlo, monospace;
+  font-size: 0.78rem;
+  white-space: nowrap;
+  opacity: 0.6;
+}
+
+.song-card-lyrics {
+  margin: 0 0 12px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: var(--cream-50);
+  color: var(--brown-800);
+  font-size: 0.86rem;
+  line-height: 1.6;
+  white-space: pre-line;
+}
+
+.song-card-audio {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+}
+
+.song-card-audio audio {
+  flex: 1;
+  min-width: 200px;
+}
+
+.song-card-audio a {
+  padding: 8px 14px;
+  border-radius: 999px;
+  background: var(--burgundy-700);
+  color: var(--cream-50);
+  font-size: 0.82rem;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.song-card-pending {
+  margin: 0;
+  color: var(--brown-800);
+  font-size: 0.84rem;
+  opacity: 0.65;
+}
+
 @media (max-width: 640px) {
   .account-popover,
   .referral-box {
