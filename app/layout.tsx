@@ -11,7 +11,7 @@ const heebo = Heebo({
 
 const siteTitle = "מנגינה אישית | יצירת שיר AI בעברית";
 const siteDescription =
-  "אתר הזמנות לשירים אישיים בעברית עם תמחור 30 ש״ח ותשתית מוכנה לחיבור ספק מוזיקה מורשה.";
+  "הופכים את הסיפור שלכם לשיר אישי בעברית — מספרים, מאשרים את המילים, ומקבלים שיר מוכן להורדה ולשיתוף במחיר קבוע של 30 ₪.";
 const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000";
 
 export const metadata: Metadata = {

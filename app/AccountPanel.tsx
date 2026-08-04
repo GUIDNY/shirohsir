@@ -2,25 +2,22 @@
 
 import { FormEvent, useState } from "react";
 import { useAccount } from "./useAccount";
-import { Loader } from "./icons";
+import { ChevronDown, Loader, UserCircle } from "./icons";
 import { BillingModal } from "./BillingModal";
 import { MySongsModal } from "./MySongsModal";
 
 type Mode = "signIn" | "signUp";
 
-function ReferralBox({ account }: { account: ReturnType<typeof useAccount> }) {
+function ReferralModal({ account, onClose }: { account: ReturnType<typeof useAccount>; onClose: () => void }) {
   const { credits, session, refreshCredits } = account;
-  const [open, setOpen] = useState(false);
   const [copied, setCopied] = useState(false);
   const [claiming, setClaiming] = useState(false);
   const [shareMessage, setShareMessage] = useState<string | null>(null);
 
-  if (!credits?.referralCode) {
-    return null;
-  }
-
   const referralLink =
-    typeof window !== "undefined" ? `${window.location.origin}/?ref=${credits.referralCode}` : "";
+    credits?.referralCode && typeof window !== "undefined"
+      ? `${window.location.origin}/?ref=${credits.referralCode}`
+      : "";
 
   const copyLink = async () => {
     try {
@@ -39,7 +36,7 @@ function ReferralBox({ account }: { account: ReturnType<typeof useAccount> }) {
       "noopener,noreferrer,width=600,height=500",
     );
 
-    if (credits.shareBonusClaimed || !session?.access_token) {
+    if (credits?.shareBonusClaimed || !session?.access_token) {
       return;
     }
 
@@ -51,10 +48,9 @@ function ReferralBox({ account }: { account: ReturnType<typeof useAccount> }) {
         method: "POST",
         headers: { Authorization: `Bearer ${session.access_token}` },
       });
-      const data = await response.json();
 
       if (response.ok) {
-        setShareMessage(`קיבלת ${data.credits} קרדיט על השיתוף!`);
+        setShareMessage("קיבלת בונוס על השיתוף! היתרה שלך עודכנה.");
         void refreshCredits();
       }
     } catch {
@@ -65,43 +61,42 @@ function ReferralBox({ account }: { account: ReturnType<typeof useAccount> }) {
   };
 
   return (
-    <div className="referral-widget">
-      <button className="account-buy" type="button" onClick={() => setOpen((v) => !v)}>
-        הזמנת חברים
-      </button>
-
-      {open && (
-        <div className="referral-box">
-          <span className="referral-title">הזמן חברים, קבל 5 קרדיטים על כל חבר שנרשם</span>
-          <div className="referral-link-row">
-            <input dir="ltr" readOnly value={referralLink} />
-            <button type="button" onClick={() => void copyLink()}>
-              {copied ? "הועתק!" : "העתקה"}
-            </button>
-          </div>
-          {!credits.shareBonusClaimed ? (
-            <button
-              className="referral-share"
-              disabled={claiming}
-              onClick={() => void shareOnFacebook()}
-              type="button"
-            >
-              {claiming && <Loader size={14} />}
-              שיתוף בפייסבוק (+1 קרדיט)
-            </button>
-          ) : (
-            shareMessage === null && <p className="referral-claimed">כבר קיבלת את בונוס השיתוף</p>
-          )}
-          {shareMessage && <p className="referral-claimed">{shareMessage}</p>}
+    <div className="billing-overlay" onClick={onClose}>
+      <div className="billing-modal referral-modal" onClick={(event) => event.stopPropagation()}>
+        <div className="billing-header">
+          <h3>הזמנת חברים</h3>
+          <button aria-label="סגירה" className="billing-close" onClick={onClose} type="button">
+            ✕
+          </button>
         </div>
-      )}
+
+        <p className="billing-demo-note">כל חבר שנרשם עם הקישור שלכם מקבל בונוס הצטרפות — וגם אתם.</p>
+
+        <div className="referral-link-row">
+          <input dir="ltr" readOnly value={referralLink} />
+          <button type="button" onClick={() => void copyLink()}>
+            {copied ? "הועתק!" : "העתקה"}
+          </button>
+        </div>
+
+        {!credits?.shareBonusClaimed ? (
+          <button className="referral-share" disabled={claiming} onClick={() => void shareOnFacebook()} type="button">
+            {claiming && <Loader size={14} />}
+            שיתוף בפייסבוק
+          </button>
+        ) : (
+          shareMessage === null && <p className="referral-claimed">כבר קיבלתם בונוס על שיתוף</p>
+        )}
+        {shareMessage && <p className="referral-claimed">{shareMessage}</p>}
+      </div>
     </div>
   );
 }
 
 export function AccountPanel({ account }: { account: ReturnType<typeof useAccount> }) {
-  const { session, user, authLoading, authError, credits, creditsLoading, signUp, signIn, signOut } = account;
+  const { session, user, authLoading, authError, credits, signUp, signIn, signOut } = account;
   const [open, setOpen] = useState(false);
+  const [menuOpen, setMenuOpen] = useState(false);
   const [referralCodeFromUrl] = useState<string | null>(() => {
     if (typeof window === "undefined") {
       return null;
@@ -116,6 +111,7 @@ export function AccountPanel({ account }: { account: ReturnType<typeof useAccoun
   const [confirmationSent, setConfirmationSent] = useState(false);
   const [billingOpen, setBillingOpen] = useState(false);
   const [songsOpen, setSongsOpen] = useState(false);
+  const [referralOpen, setReferralOpen] = useState(false);
 
   const submit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -143,32 +139,84 @@ export function AccountPanel({ account }: { account: ReturnType<typeof useAccoun
   };
 
   if (authLoading) {
-    return <div className="account-pill account-pill-loading">בודק חשבון...</div>;
+    return <div className="account-pill account-pill-loading">רק רגע...</div>;
   }
 
   if (session && user) {
+    const isAdmin = credits?.isAdmin === true;
+
     return (
       <div className="account-widget">
-        <div className="account-pill">
-          <span className="account-email">{user.email}</span>
-          <span className="account-credits-inline">
-            {creditsLoading ? "…" : credits?.isAdmin ? "∞ מנהל" : `${credits?.balance ?? 0} קרדיטים`}
+        {!isAdmin && typeof credits?.balance === "number" && (
+          <span className="header-balance" title="היתרה שלך ליצירת שירים">
+            יתרה: {credits.balance}
           </span>
-        </div>
-        <button className="account-buy" type="button" onClick={() => setSongsOpen(true)}>
-          השירים שלי
-        </button>
-        {!credits?.isAdmin && (
-          <button className="account-buy" type="button" onClick={() => setBillingOpen(true)}>
-            רכישת קרדיטים
-          </button>
         )}
-        <button className="account-signout" type="button" onClick={() => void signOut()}>
-          התנתקות
+
+        <button
+          aria-expanded={menuOpen}
+          aria-label="תפריט משתמש"
+          className="user-menu-trigger"
+          onClick={() => setMenuOpen((v) => !v)}
+          type="button"
+        >
+          <UserCircle size={22} />
+          <ChevronDown size={13} />
         </button>
-        {!credits?.isAdmin && <ReferralBox account={account} />}
+
+        {menuOpen && (
+          <div className="user-menu">
+            <div className="user-menu-email" dir="ltr">
+              {user.email}
+            </div>
+            {isAdmin && <span className="user-menu-admin-tag">מסך ניהול</span>}
+            <button
+              type="button"
+              onClick={() => {
+                setSongsOpen(true);
+                setMenuOpen(false);
+              }}
+            >
+              השירים שלי
+            </button>
+            {!isAdmin && (
+              <button
+                type="button"
+                onClick={() => {
+                  setReferralOpen(true);
+                  setMenuOpen(false);
+                }}
+              >
+                הזמנת חברים
+              </button>
+            )}
+            {!isAdmin && (
+              <button
+                type="button"
+                onClick={() => {
+                  setBillingOpen(true);
+                  setMenuOpen(false);
+                }}
+              >
+                הוספת יתרה
+              </button>
+            )}
+            <button
+              className="user-menu-signout"
+              type="button"
+              onClick={() => {
+                setMenuOpen(false);
+                void signOut();
+              }}
+            >
+              התנתקות
+            </button>
+          </div>
+        )}
+
         {billingOpen && <BillingModal account={account} onClose={() => setBillingOpen(false)} />}
         {songsOpen && <MySongsModal account={account} onClose={() => setSongsOpen(false)} />}
+        {referralOpen && <ReferralModal account={account} onClose={() => setReferralOpen(false)} />}
       </div>
     );
   }
@@ -176,7 +224,7 @@ export function AccountPanel({ account }: { account: ReturnType<typeof useAccoun
   return (
     <div className="account-widget">
       <button className="account-pill account-trigger" type="button" onClick={() => setOpen((v) => !v)}>
-        התחברות / הרשמה
+        התחברות
       </button>
 
       {open && (
@@ -206,7 +254,7 @@ export function AccountPanel({ account }: { account: ReturnType<typeof useAccoun
 
           {confirmationSent ? (
             <p className="account-confirmation">
-              נשלח מייל אישור ל־{email}. יש ללחוץ על הקישור שם כדי להפעיל את החשבון.
+              שלחנו מייל אישור ל־{email}. לוחצים על הקישור שם כדי להפעיל את החשבון.
             </p>
           ) : (
             <form className="account-form" onSubmit={submit}>
@@ -243,9 +291,7 @@ export function AccountPanel({ account }: { account: ReturnType<typeof useAccoun
 
               {mode === "signUp" && (
                 <p className="account-hint">
-                  {referralCodeFromUrl
-                    ? "הוזמנת דרך חבר — תקבל/י קרדיטים נוספים בהרשמה!"
-                    : "נותנים 3 קרדיטים חינם להתחלה."}
+                  {referralCodeFromUrl ? "הוזמנתם על ידי חבר — תקבלו בונוס הצטרפות!" : "מקבלים יתרה חינם להתחלה."}
                 </p>
               )}
             </form>

@@ -3,17 +3,13 @@
 import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
 import {
   AlertTriangle,
-  Album,
-  Api,
-  ArrowDown,
   ArrowLeft,
   ArrowUp,
-  Bolt,
   CheckCircle,
   CheckSmall,
+  ChevronDown,
   Coin,
   Copy,
-  CreditCard,
   Edit,
   Gift,
   GraduationCap,
@@ -22,9 +18,9 @@ import {
   Lyrics,
   Mic,
   MusicNote,
+  Plus,
   PlayCircle,
   Refresh,
-  ShieldCheck,
   Storefront,
 } from "./icons";
 import { AccountPanel } from "./AccountPanel";
@@ -64,7 +60,9 @@ type ApiResult = {
   downloadFileName?: string;
 };
 
-type CreditsInfo = {
+// Admin-only operational data (the real music-provider quota) — never
+// rendered for a regular customer, see the `isAdmin`-gated block below.
+type ProviderQuotaInfo = {
   mode: "demo" | "live";
   status: string;
   tier?: string;
@@ -74,9 +72,10 @@ type CreditsInfo = {
   percentUsed?: number;
   overageDisabled?: boolean;
   nextReset?: string | null;
-  updatedAt?: string;
 };
 
+// Customer-facing labels only — the underlying value ("gift" | "business" |
+// "graduation") is the real field sent to the server and must not change.
 const songTypes: Array<{
   id: SongType;
   label: string;
@@ -86,19 +85,19 @@ const songTypes: Array<{
   {
     id: "gift",
     label: "שיר מתנה",
-    description: "יום הולדת, זוגיות, חתונה, גיוס, ברכה אישית",
+    description: "ליום הולדת, זוגיות, חתונה, גיוס או הפתעה מרגשת.",
     icon: Gift,
   },
   {
     id: "business",
     label: "שיר לעסק",
-    description: "ג'ינגל קצר, קמפיין, מותג, פתיח לסרטון",
+    description: "לפרסום, אירוע, קמפיין, פתיח או תוכן לרשתות.",
     icon: Storefront,
   },
   {
     id: "graduation",
-    label: "מסיבת סיום",
-    description: "גן, בית ספר, צוות, שכבה או טקס סוף שנה",
+    label: "שיר למסיבה או אירוע",
+    description: "לגן, בית ספר, צוות, מסיבת סיום או חגיגה משפחתית.",
     icon: GraduationCap,
   },
 ];
@@ -123,7 +122,6 @@ const initialOrder: OrderPayload = {
   songLengthSeconds: 20,
 };
 
-const SECONDS_PER_CREDIT = 10;
 const songLengthOptions = [10, 20, 30, 45, 60];
 
 const styles = [
@@ -139,7 +137,6 @@ const moods = ["מרגש אבל לא כבד", "שמח וקופצני", "מצחי
 const vocalists = ["זמרת ישראלית חמה", "זמר ישראלי חם", "דואט גבר ואישה", "קולות קבוצה", "קול צעיר ונקי", "קול בוגר ומכובד"];
 const languageRegisters = ["עברית ישראלית מדוברת", "עברית חגיגית ונקייה", "עברית קלילה עם סלנג עדין", "עברית לילדים"];
 const lyricStructures = ["בית קצר ופזמון קליט", "פזמון פתיחה ישר לעניין", "ג'ינגל עם סלוגן", "ברכה אישית מרגשת"];
-const numberFormatter = new Intl.NumberFormat("he-IL");
 
 const requiredOrderFields: Array<{ key: keyof OrderPayload; label: string }> = [
   { key: "recipient", label: "שם/מותג שעליו השיר" },
@@ -150,69 +147,55 @@ const requiredOrderFields: Array<{ key: keyof OrderPayload; label: string }> = [
   { key: "phone", label: "טלפון" },
 ];
 
+const processSteps = [
+  { title: "בוחרים סוג שיר", detail: "יום הולדת, חתונה, זוגיות, עסק או כל אירוע אחר." },
+  { title: "מספרים את הסיפור", detail: "מוסיפים שמות, זיכרונות, בדיחות ורגעים מיוחדים." },
+  { title: "מאשרים את המילים", detail: "עוברים על הטקסט ומבקשים תיקונים לפני הפקת השיר." },
+  { title: "מקבלים את השיר", detail: "מורידים את הגרסאות המוכנות ומשתפים עם מי שאוהבים." },
+];
+
 const allowedRules = [
   {
-    icon: CheckCircle,
-    title: "שימוש מסחרי מורשה",
-    detail: "למכור שיר מקורי שנוצר בתוכנית שמעניקה שימוש מסחרי.",
-  },
-  {
-    icon: Edit,
-    title: "תוכן מקורי של הלקוח",
-    detail: "להשתמש בסיפורים, שמות וסלוגנים שהלקוח מוסר ויש לו זכות להשתמש בהם.",
+    icon: Lyrics,
+    title: "סיפור אישי",
+    detail: "אפשר להשתמש בשמות, זיכרונות, בדיחות ורגעים מיוחדים.",
   },
   {
     icon: MusicNote,
-    title: "סגנון מקורי",
-    detail: "לכתוב מילים מקוריות ולבקש סגנון כללי כמו פופ, בלדה או ג׳ינגל.",
+    title: "סגנון מוזיקלי לבחירה",
+    detail: "אפשר לבקש שיר שמח, מרגש, קצבי, רגוע או חגיגי.",
   },
   {
-    icon: ShieldCheck,
-    title: "שקיפות לפני תשלום",
-    detail: "להציג ללקוח תנאים, מגבלות AI וזמן אספקה לפני תשלום.",
+    icon: Edit,
+    title: "תיקונים במילים",
+    detail: "לפני הפקת השיר תוכלו לעבור על הטקסט ולבקש התאמות.",
   },
 ];
 
 const blockedRules = [
   {
     icon: Copy,
-    title: "העתקת נכסים",
-    detail: "לא להעתיק עיצוב, טקסטים, שם, לוגו או נכסים של אתר מתחרה.",
+    title: "העתקה של שירים קיימים",
+    detail: "לא ניתן להשתמש במילים או במנגינה של שיר מוגן.",
   },
   {
     icon: Mic,
-    title: "חיקוי ללא הסכמה",
-    detail: "לא לבקש סגנון של אמן מוכר או לחקות קול של אדם אמיתי בלי הסכמה כתובה.",
-  },
-  {
-    icon: Lock,
-    title: "חומר מוגן בזכויות",
-    detail: "לא להזין מילים משיר קיים, פלייבק מוגן או חומר של לקוח שאין לו זכויות.",
+    title: "חיקוי מדויק של זמר",
+    detail: "אפשר לבחור סגנון כללי, אך לא לחקות באופן מדויק קול של אדם אמיתי.",
   },
   {
     icon: AlertTriangle,
-    title: "הבטחות מוגזמות",
-    detail: "לא להבטיח זכויות יוצרים רשומות או תוצאה מושלמת ממערכת AI.",
-  },
-];
-
-const apiCards = [
-  {
-    icon: CreditCard,
-    title: "מוכן לתשלום",
-    detail: "הכפתור כרגע מדמה הזמנה. בגרסה חיה מחברים סליקה לפני שליחת הבקשה להפקה.",
-  },
-  {
-    icon: ShieldCheck,
-    title: "בדיקות שימוש",
-    detail: "הטופס אוסף אישור זכויות ומונע במפורש בקשות לחיקוי זמרים, שירים קיימים או קולות בלי הסכמה.",
+    title: "תוכן פוגעני או ללא הסכמה",
+    detail: "לא ניתן ליצור תוכן שמבזה אדם אחר או משתמש בפרטיו באופן לא ראוי.",
   },
   {
     icon: Lock,
-    title: "Adapter נקי",
-    detail: "`/api/orders` מרכז את החיבור לספק החיצוני, כך שהטופס לא יודע אם זה דמו, Suno מורשה או ספק אחר.",
+    title: "הבטחת הצלחה מסחרית",
+    detail: "לא ניתן להבטיח ששיר יצליח, יתפרסם או יניב הכנסות.",
   },
 ];
+
+const numberFormatter = new Intl.NumberFormat("he-IL");
 
 function formatNumber(value: number | undefined) {
   return typeof value === "number" ? numberFormatter.format(value) : "—";
@@ -250,10 +233,51 @@ export default function Home() {
   const [status, setStatus] = useState<OrderStatus>("idle");
   const [orderError, setOrderError] = useState<string | null>(null);
   const [result, setResult] = useState<ApiResult | null>(null);
-  const [credits, setCredits] = useState<CreditsInfo | null>(null);
-  const [creditsStatus, setCreditsStatus] = useState<"loading" | "ready" | "error">("loading");
-  const isLiveCredits = creditsStatus === "ready" && credits?.mode === "live";
+  const [summaryOpenMobile, setSummaryOpenMobile] = useState(false);
+  const [providerQuota, setProviderQuota] = useState<ProviderQuotaInfo | null>(null);
+  const [providerQuotaStatus, setProviderQuotaStatus] = useState<"loading" | "ready" | "error">("loading");
   const isAdmin = account.credits?.isAdmin === true;
+  const isLiveProviderQuota = providerQuotaStatus === "ready" && providerQuota?.mode === "live";
+  const accessToken = account.session?.access_token;
+
+  // Admin-only operational view — never fetched or rendered for a regular
+  // customer. See app/api/credits/route.ts, which 403s for non-admins too.
+  const refreshProviderQuota = useCallback(async () => {
+    if (!isAdmin || !accessToken) {
+      return;
+    }
+
+    try {
+      const response = await fetch("/api/credits", {
+        cache: "no-store",
+        headers: { Authorization: `Bearer ${accessToken}` },
+      });
+
+      if (!response.ok) {
+        throw new Error("Provider quota request failed");
+      }
+
+      const data = (await response.json()) as ProviderQuotaInfo;
+      setProviderQuota(data);
+      setProviderQuotaStatus("ready");
+    } catch {
+      setProviderQuotaStatus("error");
+    }
+  }, [isAdmin, accessToken]);
+
+  useEffect(() => {
+    if (!isAdmin) {
+      return;
+    }
+
+    const initial = window.setTimeout(() => void refreshProviderQuota(), 0);
+    const interval = window.setInterval(() => void refreshProviderQuota(), 30000);
+
+    return () => {
+      window.clearTimeout(initial);
+      window.clearInterval(interval);
+    };
+  }, [isAdmin, refreshProviderQuota]);
 
   const selectedType = songTypes.find((item) => item.id === order.songType) ?? songTypes[0];
   const completion = useMemo(() => {
@@ -274,45 +298,15 @@ export default function Home() {
     return Math.round((filled / required.length) * 100);
   }, [order]);
 
+  // Drives both the order form's own step tabs and the marketing process
+  // band above it — real state, not a fixed/decorative indicator: the
+  // form's step (0/1/2) maps directly to process steps 0/1/2, and a
+  // delivered result bumps it to the final "מקבלים את השיר" step.
+  const activeProcessIndex = result ? 3 : step;
+
   const setField = <K extends keyof OrderPayload>(key: K, value: OrderPayload[K]) => {
     setOrder((current) => ({ ...current, [key]: value }));
   };
-
-  const accessToken = account.session?.access_token;
-
-  const refreshCredits = useCallback(async () => {
-    if (!isAdmin || !accessToken) {
-      return;
-    }
-
-    try {
-      const response = await fetch("/api/credits", {
-        cache: "no-store",
-        headers: { Authorization: `Bearer ${accessToken}` },
-      });
-
-      if (!response.ok) {
-        throw new Error("Credits request failed");
-      }
-
-      const data = (await response.json()) as CreditsInfo;
-      setCredits(data);
-      setCreditsStatus("ready");
-    } catch {
-      setCreditsStatus("error");
-    }
-  }, [isAdmin, accessToken]);
-
-  useEffect(() => {
-    if (!isAdmin) {
-      return;
-    }
-
-    void refreshCredits();
-    const interval = window.setInterval(() => void refreshCredits(), 30000);
-
-    return () => window.clearInterval(interval);
-  }, [isAdmin, refreshCredits]);
 
   const submitOrder = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -323,7 +317,7 @@ export default function Home() {
 
     if (missingField) {
       setStep(1);
-      setOrderError(`חסר שדה חובה: "${missingField.label}". אפשר להשלים אותו בשלב "פרטים".`);
+      setOrderError(`חסר פרט: "${missingField.label}". אפשר להשלים אותו בשלב "מספרים את הסיפור".`);
       setStatus("error");
       return;
     }
@@ -344,14 +338,14 @@ export default function Home() {
       });
 
       if (response.status === 402) {
-        setOrderError("נגמרו לך הקרדיטים. אפשר להירשם לחבילה נוספת או לרכוש קרדיטים.");
+        setOrderError("היתרה שלכם לא מספיקה ליצירת שיר נוסף כרגע. אפשר להוסיף יתרה מתפריט המשתמש.");
         setStatus("error");
         return;
       }
 
       if (response.status === 400) {
         setStep(1);
-        setOrderError("חסרים פרטים בטופס — אפשר לעבור על שלב \"פרטים\" ולוודא שכל השדות מלאים.");
+        setOrderError('חסרים פרטים בטופס — אפשר לעבור על שלב "מספרים את הסיפור" ולוודא שהכול מלא.');
         setStatus("error");
         return;
       }
@@ -364,10 +358,10 @@ export default function Home() {
       setResult(data);
       setStatus("ready");
       setStep(2);
-      void refreshCredits();
       void account.refreshCredits();
+      void refreshProviderQuota();
     } catch {
-      setOrderError("לא הצלחנו לשלוח כרגע. אפשר לבדוק חיבור API ולנסות שוב.");
+      setOrderError("לא הצלחנו להשלים את הפעולה כרגע. אפשר לנסות שוב בעוד מספר דקות.");
       setStatus("error");
     }
   };
@@ -375,40 +369,41 @@ export default function Home() {
   return (
     <main className="site-shell" dir="rtl">
       <nav className="topbar" aria-label="ניווט ראשי">
-        <a className="brand" href="#top" aria-label="מנגינה אישית">
-          <span className="brand-mark">
-            <MusicNote size={20} strokeWidth={2.1} />
-          </span>
-          <span>מנגינה אישית</span>
-        </a>
+        <div className="topbar-start">
+          <a className="brand" href="#top" aria-label="מנגינה אישית">
+            <span className="brand-mark">
+              <MusicNote size={20} strokeWidth={2.1} />
+            </span>
+            <span>מנגינה אישית</span>
+          </a>
 
-        <div className="topbar-actions">
-          <a href="#api">חיבור API</a>
-          <a href="#legal">מה מותר</a>
+          <div className="topbar-actions">
+            <a href="#how">איך זה עובד</a>
+            <a href="#legal">מה מותר</a>
+          </div>
         </div>
 
         <div className="topbar-end">
-          <AccountPanel account={account} />
           {isAdmin && (
-            <div className="credit-pill" aria-live="polite" title="מלאי הפקה מול ElevenLabs (מנהל בלבד)">
-              <span>מלאי:</span>
+            <div className="admin-quota-pill" title="מסך ניהול — מלאי ספק המוזיקה">
+              <Coin size={15} className="coin-icon" />
               <strong>
-                {creditsStatus === "loading"
+                {providerQuotaStatus === "loading"
                   ? "בודק..."
-                  : creditsStatus === "error"
+                  : providerQuotaStatus === "error"
                     ? "לא זמין"
-                    : formatNumber(credits?.remaining)}
+                    : formatNumber(providerQuota?.remaining)}
               </strong>
-              <Coin size={16} className="coin-icon" />
-              <button type="button" onClick={refreshCredits} aria-label="רענון מלאי">
-                <Refresh size={13} />
+              <button type="button" onClick={refreshProviderQuota} aria-label="רענון">
+                <Refresh size={12} />
               </button>
             </div>
           )}
           <a className="nav-cta" href="#order">
-            הזמנה ב־30 ש״ח
-            <ArrowLeft size={16} />
+            <Plus size={16} />
+            שיר חדש
           </a>
+          <AccountPanel account={account} />
         </div>
       </nav>
 
@@ -416,60 +411,40 @@ export default function Home() {
         <div className="hero-copy">
           <p className="eyebrow">
             <span className="eyebrow-dot" />
-            שירים אישיים בעברית • תהליך מכירה מוכן
+            שירים אישיים בעברית, מוכנים תוך דקות
           </p>
-          <h1>
-            מזמינים <em>סיפור</em>,
-            <br />
-            מקבלים שיר
-            <br />
-            <span className="accent-text">מוכן למכירה.</span>
-          </h1>
+          <h1>הופכים את הסיפור שלכם לשיר אישי.</h1>
           <p className="hero-text">
-            אתר מקורי ליצירת שירים לפי פרטים שהלקוח ממלא, עם מחיר ברור של 30 ש״ח,
-            אישור תנאים, ותשתית שמוכנה להתחבר לספק מוזיקה חוקי ברגע שיש מפתח API.
+            ספרו לנו על האדם, האירוע והרגעים החשובים. אנחנו נכתוב, נלחין ונפיק עבורכם שיר מקורי ומרגש,
+            מוכן לשיתוף ולהורדה.
           </p>
           <div className="hero-actions">
             <a className="primary-link" href="#order">
               <PlayCircle size={20} />
-              להתחיל הזמנה
+              מתחילים ליצור שיר
             </a>
-            <a className="secondary-link" href="#legal">
-              לראות מגבלות שימוש
+            <a className="secondary-link" href="#how">
+              איך זה עובד?
             </a>
           </div>
-          <dl className="trust-strip" aria-label="נתוני השירות">
+          <dl className="trust-strip" aria-label="למה לבחור בנו">
             <div>
-              <span className="trust-icon">
-                <CreditCard size={18} />
-              </span>
-              <dt>30 ש״ח</dt>
-              <dd>מחיר פיקס לשיר אחד</dd>
+              <dt>שיר אישי ב-30 ₪</dt>
+              <dd>מחיר קבוע וברור, ללא הפתעות.</dd>
             </div>
             <div>
-              <span className="trust-icon">
-                <MusicNote size={18} />
-              </span>
-              <dt>2 גרסאות</dt>
-              <dd>מבנה מוכן למסירה מיידית</dd>
+              <dt>שתי גרסאות לבחירה</dt>
+              <dd>תקבלו שתי גרסאות שונות ותבחרו את זו שאתם הכי אוהבים.</dd>
             </div>
             <div>
-              <span className="trust-icon">
-                <Api size={18} />
-              </span>
-              <dt>API-ready</dt>
-              <dd>תשתית גמישה, בלי לנעול ספק</dd>
+              <dt>מוכן לשיתוף ולהורדה</dt>
+              <dd>קובץ שמע איכותי שאפשר לשלוח למשפחה ולחברים.</dd>
             </div>
           </dl>
         </div>
 
         <div className="studio-visual" aria-label="תצוגת שיר">
           <div className="record-sleeve">
-            <div className="sleeve-topline">
-              <span className="catalog-code">SR·01 // CUSTOM AUDIO</span>
-              <Album size={18} />
-            </div>
-
             <div className="vinyl-stage">
               <span className="vinyl-ring" aria-hidden="true" />
               <span className="vinyl-ring vinyl-ring--outer" aria-hidden="true" />
@@ -490,56 +465,52 @@ export default function Home() {
             </span>
             <div>
               <strong>טיוטת מילים לאישור</strong>
-              <span>נוצרת לפני הפקת האודיו</span>
+              <span>נשלחת אליכם לפני שהשיר מופק</span>
             </div>
-            <span className="player-action" aria-hidden="true">
-              <ArrowDown size={16} />
-            </span>
           </div>
         </div>
       </section>
 
-      <section className="process-band" aria-label="שלבי השירות">
-        {[
-          ["01", "הלקוח ממלא סיפור"],
-          ["02", "תשלום מאובטח"],
-          ["03", "מילים לאישור"],
-          ["04", "הפקה והורדה"],
-        ].map(([number, text]) => (
-          <div className="process-item" key={number}>
-            <strong>{text}</strong>
-            <span>{number}</span>
-          </div>
-        ))}
+      <section id="how" className="process-band" aria-label="איך זה עובד">
+        <div className="process-band-inner">
+          {processSteps.map((item, index) => {
+            const state =
+              index < activeProcessIndex ? "done" : index === activeProcessIndex ? "active" : "upcoming";
+
+            return (
+              <div className={`process-item process-item--${state}`} key={item.title}>
+                <span className="process-item-marker">{state === "done" ? <CheckSmall size={14} /> : index + 1}</span>
+                <div>
+                  <strong>{item.title}</strong>
+                  <span>{item.detail}</span>
+                </div>
+              </div>
+            );
+          })}
+        </div>
       </section>
 
       <section id="order" className="order-section">
         <div className="section-intro">
-          <p className="eyebrow">
-            <Bolt size={13} />
-            תהליך יצירה חכם
-          </p>
+          <p className="eyebrow">התהליך שלנו</p>
           <h2>
             כל מה שצריך כדי
             <br />
-            <span className="accent-text-alt">להפוך פרטים לשיר.</span>
+            <span className="accent-text-alt">להפוך סיפור לשיר.</span>
           </h2>
-          <p>
-            הזרימה כאן בנויה כדי למכור שיר אחד בכל פעם: בחירת סוג, איסוף פרטים,
-            אישור שימוש ותשלום. ההפקה מחוברת ל־ElevenLabs כשיש מפתח פעיל; התשלום עדיין במצב הדגמה.
-          </p>
+          <p>ממלאים כמה פרטים, מאשרים את המילים לפני ההפקה, ומקבלים שיר מוכן להורדה ולשיתוף.</p>
         </div>
 
         <form className="order-tool" onSubmit={submitOrder}>
-          <div className="steps" aria-label="התקדמות">
-            {["סוג שיר", "פרטים", "סיכום"].map((label, index) => (
+          <div className="steps" aria-label="התקדמות ביצירת השיר">
+            {["סוג שיר", "הסיפור", "סיכום"].map((label, index) => (
               <button
                 className={step === index ? "active" : ""}
                 key={label}
                 type="button"
                 onClick={() => setStep(index)}
               >
-                <span>{index + 1}</span>
+                <span>{step > index ? <CheckSmall size={13} /> : index + 1}</span>
                 {label}
               </button>
             ))}
@@ -556,8 +527,8 @@ export default function Home() {
                   <MusicNote size={18} />
                 </span>
                 <div>
-                  <h3>איזה שיר יוצרים?</h3>
-                  <p>בחר סוג הזמנה כדי להתאים את השאלות ואת הפרומפט.</p>
+                  <h3>איזה רגע הופכים לשיר?</h3>
+                  <p>בחרו את הסוג שהכי מתאים לרגע שלכם.</p>
                 </div>
               </div>
               <div className="type-grid">
@@ -569,6 +540,11 @@ export default function Home() {
                       onChange={() => setField("songType", type.id)}
                       type="radio"
                     />
+                    {order.songType === type.id && (
+                      <span className="type-card-check">
+                        <CheckSmall size={13} />
+                      </span>
+                    )}
                     <span className="type-card-icon">
                       <type.icon size={22} />
                     </span>
@@ -581,32 +557,25 @@ export default function Home() {
               <div className="length-picker">
                 <span className="length-picker-label">אורך השיר</span>
                 <div className="length-grid">
-                  {songLengthOptions.map((seconds) => {
-                    const creditsCost = Math.max(1, Math.ceil(seconds / SECONDS_PER_CREDIT));
-
-                    return (
-                      <label
-                        className={order.songLengthSeconds === seconds ? "length-card selected" : "length-card"}
-                        key={seconds}
-                      >
-                        <input
-                          checked={order.songLengthSeconds === seconds}
-                          name="songLengthSeconds"
-                          onChange={() => setField("songLengthSeconds", seconds)}
-                          type="radio"
-                        />
-                        <strong>{seconds} שנ&apos;</strong>
-                        <span>
-                          {creditsCost} {creditsCost === 1 ? "קרדיט" : "קרדיטים"}
-                        </span>
-                      </label>
-                    );
-                  })}
+                  {songLengthOptions.map((seconds) => (
+                    <label
+                      className={order.songLengthSeconds === seconds ? "length-card selected" : "length-card"}
+                      key={seconds}
+                    >
+                      <input
+                        checked={order.songLengthSeconds === seconds}
+                        name="songLengthSeconds"
+                        onChange={() => setField("songLengthSeconds", seconds)}
+                        type="radio"
+                      />
+                      <strong>{seconds} שנ&apos;</strong>
+                    </label>
+                  ))}
                 </div>
               </div>
 
               <button className="primary-button" type="button" onClick={() => setStep(1)}>
-                ממשיכים לפרטים
+                ממשיכים לסיפור
                 <ArrowLeft size={18} />
               </button>
             </div>
@@ -619,8 +588,8 @@ export default function Home() {
                   <Edit size={18} />
                 </span>
                 <div>
-                  <h3>{selectedType.label}: פרטים לכתיבה</h3>
-                  <p>ככל שהפרטים מדויקים יותר, השיר נשמע פחות גנרי.</p>
+                  <h3>{selectedType.label}: מספרים את הסיפור</h3>
+                  <p>ככל שהפרטים מדויקים יותר, השיר יישמע אישי יותר.</p>
                 </div>
               </div>
 
@@ -712,7 +681,7 @@ export default function Home() {
                     required
                     value={order.story}
                     onChange={(event) => setField("story", event.target.value)}
-                    placeholder="ספר בכמה משפטים על האדם, העסק או הכיתה. רגעים מצחיקים, מילים חשובות, או מסר שצריך להישאר."
+                    placeholder="ספרו בכמה משפטים על האדם, העסק או הכיתה. רגעים מצחיקים, מילים חשובות, או מסר שצריך להישאר."
                   />
                 </label>
                 <label className="wide">
@@ -760,7 +729,7 @@ export default function Home() {
                   חזרה
                 </button>
                 <button className="primary-button" type="button" onClick={() => setStep(2)}>
-                  לסיכום ותשלום
+                  לסיכום ההזמנה
                   <ArrowLeft size={18} />
                 </button>
               </div>
@@ -771,20 +740,16 @@ export default function Home() {
             <div className="form-panel summary-panel">
               <div className="panel-heading">
                 <span className="panel-icon">
-                  <CreditCard size={18} />
+                  <CheckCircle size={18} />
                 </span>
                 <div>
-                  <h3>סיכום לפני חיוב</h3>
-                  <p>בגרסה חיה מחברים כאן Stripe, PayPlus, משולם או ספק סליקה ישראלי.</p>
+                  <h3>מאשרים ושולחים</h3>
+                  <p>עוברים על הפרטים, מאשרים את תנאי השימוש, ושולחים ליצירה.</p>
                 </div>
               </div>
               <div className="summary-grid">
                 <div>
-                  <span>חבילה</span>
-                  <strong>שיר אחד בהתאמה אישית</strong>
-                </div>
-                <div>
-                  <span>סוג</span>
+                  <span>סוג השיר</span>
                   <strong>{selectedType.label}</strong>
                 </div>
                 <div>
@@ -792,21 +757,12 @@ export default function Home() {
                   <strong>{order.style}</strong>
                 </div>
                 <div>
-                  <span>עברית</span>
-                  <strong>{order.languageRegister}</strong>
-                </div>
-                <div>
                   <span>אורך</span>
-                  <strong>
-                    {order.songLengthSeconds} שנ&apos; ·{" "}
-                    {isAdmin
-                      ? "ללא עלות (מנהל)"
-                      : `${Math.max(1, Math.ceil(order.songLengthSeconds / SECONDS_PER_CREDIT))} קרדיטים`}
-                  </strong>
+                  <strong>{order.songLengthSeconds} שניות</strong>
                 </div>
                 <div>
-                  <span>מחיר</span>
-                  <strong>30 ש״ח</strong>
+                  <span>מחיר כולל</span>
+                  <strong>30 ₪</strong>
                 </div>
               </div>
 
@@ -825,16 +781,18 @@ export default function Home() {
 
               <button className="pay-button" disabled={status === "sending"} type="submit">
                 {status === "sending" ? <Loader size={18} /> : <Lock size={18} />}
-                {status === "sending" ? "שולח להזמנה" : "הדמיית הזמנה ב־30 ש\"ח"}
+                {status === "sending" ? "יוצרים את השיר..." : 'יצירת השיר ב-30 ש"ח'}
               </button>
 
               {result && (
                 <div className="api-result">
                   <CheckCircle size={20} />
                   <div>
-                    <strong>הזמנה נוצרה: {result.orderId}</strong>
+                    <strong>ההזמנה נשמרה בהצלחה!</strong>
                     <span>
-                      מצב: {result.mode === "live" ? "מחובר לספק" : "דמו"} · ספק: {result.provider}
+                      {result.audioDataUrl
+                        ? "השיר שלכם מוכן — אפשר להאזין ולהוריד למטה."
+                        : "נמשיך לעדכן אתכם באזור האישי ברגע שהשיר מוכן."}
                     </span>
                     {result.promptPreview && (
                       <div className="lyrics-preview">
@@ -859,172 +817,149 @@ export default function Home() {
           )}
         </form>
 
-        <aside className="order-sidebar" aria-label="תקציר הזמנה">
-          <div className="progress-box">
-            <div className="progress-heading">
-              <span>שלמות פרטים</span>
-              <strong>{completion}%</strong>
+        <aside className="order-sidebar" aria-label="ההזמנה שלך">
+          <button
+            aria-controls="order-summary-panel"
+            aria-expanded={summaryOpenMobile}
+            className="order-summary-toggle"
+            onClick={() => setSummaryOpenMobile((v) => !v)}
+            type="button"
+          >
+            <span>ההזמנה שלך</span>
+            <span className="order-summary-toggle-end">
+              <span className="order-summary-toggle-price">30 ₪</span>
+              <ChevronDown className="order-summary-toggle-chevron" size={16} />
+            </span>
+          </button>
+
+          <div className={summaryOpenMobile ? "order-summary-card open" : "order-summary-card"} id="order-summary-panel">
+            <h3 className="order-summary-title">ההזמנה שלך</h3>
+
+            <dl className="order-summary-facts">
+              <div>
+                <dt>סוג השיר</dt>
+                <dd>{selectedType.label}</dd>
+              </div>
+              <div>
+                <dt>אורך</dt>
+                <dd>{order.songLengthSeconds} שניות</dd>
+              </div>
+              <div>
+                <dt>מה מקבלים</dt>
+                <dd>שתי גרסאות</dd>
+              </div>
+              <div>
+                <dt>מחיר כולל</dt>
+                <dd>30 ₪</dd>
+              </div>
+            </dl>
+
+            <div className="order-summary-progress">
+              <div className="progress-heading">
+                <span>שלמות פרטים</span>
+                <strong>{completion}%</strong>
+              </div>
+              <div className="progress-track">
+                <span style={{ width: `${completion}%` }} />
+              </div>
             </div>
-            <div className="progress-track">
-              <span style={{ width: `${completion}%` }} />
-            </div>
+
+            <ul className="order-benefits">
+              {[
+                "אישור המילים לפני ההפקה",
+                "שתי גרסאות שונות לבחירה",
+                "קובץ שמע מוכן להורדה",
+                "אזור אישי לצפייה בהזמנות",
+              ].map((item) => (
+                <li key={item}>
+                  <CheckSmall size={15} />
+                  {item}
+                </li>
+              ))}
+            </ul>
           </div>
 
-          {isAdmin ? (
-            <div className="voice-engine-card">
-              <div className="voice-engine-heading">
-                <span className="voice-engine-name">
-                  מנוע קולי · מנהל
-                  <strong>ElevenLabs</strong>
-                </span>
-                <span className={isLiveCredits ? "connected-pill" : "connected-pill offline"}>
+          {isAdmin && (
+            <div className="admin-quota-card">
+              <div className="admin-quota-heading">
+                <span>מסך ניהול — מלאי ספק המוזיקה</span>
+                <span className={isLiveProviderQuota ? "connected-pill" : "connected-pill offline"}>
                   <span className="connected-dot" />
-                  {isLiveCredits ? "מחובר" : creditsStatus === "loading" ? "בודק" : "מצב הדגמה"}
+                  {isLiveProviderQuota ? "מחובר" : providerQuotaStatus === "loading" ? "בודק" : "מצב הדגמה"}
                 </span>
               </div>
 
-              {isLiveCredits ? (
+              {isLiveProviderQuota ? (
                 <>
-                  <span className="voice-engine-label">תווים נותרים לחודש</span>
-                  <div className="voice-engine-stat">
-                    <span>{formatCompact(credits?.limit)} /</span>
-                    <strong>{formatCompact(credits?.remaining)}</strong>
+                  <div className="admin-quota-stat">
+                    <span>{formatCompact(providerQuota?.limit)} /</span>
+                    <strong>{formatCompact(providerQuota?.remaining)}</strong>
                   </div>
-                  <div className="voice-engine-track">
-                    <span style={{ width: `${credits?.percentUsed ?? 0}%` }} />
+                  <div className="admin-quota-track">
+                    <span style={{ width: `${providerQuota?.percentUsed ?? 0}%` }} />
                   </div>
-                  <div className="voice-engine-grid">
+                  <div className="admin-quota-grid">
                     <div>
                       <span>תוכנית</span>
-                      <strong>{credits?.tier || "לא ידוע"}</strong>
+                      <strong>{providerQuota?.tier || "לא ידוע"}</strong>
                     </div>
                     <div>
                       <span>נוצל</span>
-                      <strong>{formatNumber(credits?.used)}</strong>
+                      <strong>{formatNumber(providerQuota?.used)}</strong>
                     </div>
                   </div>
-                  <div className="voice-engine-footer">
-                    <span>{credits?.overageDisabled ? "חריגה כבויה" : "חריגה אפשרית"}</span>
-                    <span>איפוס ב: {formatReset(credits?.nextReset)}</span>
+                  <div className="admin-quota-footer">
+                    <span>{providerQuota?.overageDisabled ? "חריגה כבויה" : "חריגה אפשרית"}</span>
+                    <span>איפוס ב: {formatReset(providerQuota?.nextReset)}</span>
                   </div>
                 </>
               ) : (
-                <p className="voice-engine-fallback">
-                  {creditsStatus === "loading" ? "בודק חיבור ל-ElevenLabs..." : "אין מפתח ElevenLabs פעיל — מצב הדגמה."}
+                <p className="admin-quota-fallback">
+                  {providerQuotaStatus === "loading" ? "בודק חיבור..." : "אין מפתח ספק פעיל — מצב הדגמה."}
                 </p>
               )}
             </div>
-          ) : (
-            account.user && (
-              <div className="voice-engine-card">
-                <div className="voice-engine-heading">
-                  <span className="voice-engine-name">היתרה שלך</span>
-                </div>
-                <div className="voice-engine-stat">
-                  <strong>{account.credits?.balance ?? 0}</strong>
-                  <span>קרדיטים</span>
-                </div>
-                <p className="voice-engine-fallback">כל קרדיט שווה 10 שניות שיר.</p>
-              </div>
-            )
           )}
-
-          <div className="price-box">
-            <span>תשלום ללקוח</span>
-            <strong>30 ש״ח</strong>
-            <p>כדי להרוויח, העלות שלך להפקה+סליקה+תמיכה חייבת להיות נמוכה מזה.</p>
-          </div>
-
-          <div className="checklist-box">
-            {[
-              "מילים לאישור לפני הפקה",
-              "שתי גרסאות אודיו",
-              "אזור אישי בהמשך",
-              "Webhook מספק מוזיקה",
-            ].map((item) => (
-              <span key={item}>
-                <CheckSmall size={15} />
-                {item}
-              </span>
-            ))}
-          </div>
         </aside>
-      </section>
-
-      <section id="api" className="api-section">
-        <div className="section-intro">
-          <p className="eyebrow">
-            <Api size={13} />
-            תשתית API
-          </p>
-          <h2>
-            מוכן לספק מוזיקה,
-            <br />
-            <span className="accent-text">אבל לא תלוי ב־Suno לא רשמי.</span>
-          </h2>
-          <p>
-            ה־endpoint המקומי מקבל את ההזמנה, בונה פרומפט עברי מדויק ומחזיר קובץ MP3 לניגון והורדה.
-            במקביל האתר קורא את מצב הקרדיטים מ־ElevenLabs ומעדכן אותו אוטומטית.
-          </p>
-        </div>
-        <div className="api-grid">
-          {apiCards.map((card) => (
-            <div className="api-card" key={card.title}>
-              <span className="api-card-icon">
-                <card.icon size={20} />
-              </span>
-              <h3>{card.title}</h3>
-              <p>{card.detail}</p>
-            </div>
-          ))}
-        </div>
       </section>
 
       <section id="legal" className="legal-section">
         <div className="section-intro">
-          <p className="eyebrow">מה מותר ומה לא</p>
-          <h2>כללי עבודה קצרים לפני שמוכרים שירים.</h2>
+          <p className="eyebrow">לפני שמתחילים</p>
+          <h2>כמה דברים חשובים לפני שמתחילים.</h2>
         </div>
-        <div className="rules-grid">
-          <div className="rules-column allowed">
-            <div className="rules-column-heading">
-              <h3>מותר בדרך כלל</h3>
-              <span className="rules-badge good">
-                <CheckSmall size={14} />
-              </span>
-            </div>
-            <div className="rules-list">
-              {allowedRules.map((rule) => (
-                <div className="rule-card" key={rule.title}>
-                  <span className="rule-icon good">
-                    <rule.icon size={17} />
-                  </span>
-                  <div>
-                    <strong>{rule.title}</strong>
-                    <p>{rule.detail}</p>
-                  </div>
+
+        <div className="rules-group">
+          <h3 className="rules-group-title rules-group-title--good">מה אפשר ליצור</h3>
+          <div className="rules-list rules-list--3">
+            {allowedRules.map((rule) => (
+              <div className="rule-card" key={rule.title}>
+                <span className="rule-icon good">
+                  <rule.icon size={17} />
+                </span>
+                <div>
+                  <strong>{rule.title}</strong>
+                  <p>{rule.detail}</p>
                 </div>
-              ))}
-            </div>
+              </div>
+            ))}
           </div>
-          <div className="rules-column blocked">
-            <div className="rules-column-heading">
-              <h3>אסור בלי אישור</h3>
-              <span className="rules-badge bad">✕</span>
-            </div>
-            <div className="rules-list">
-              {blockedRules.map((rule) => (
-                <div className="rule-card" key={rule.title}>
-                  <span className="rule-icon bad">
-                    <rule.icon size={17} />
-                  </span>
-                  <div>
-                    <strong>{rule.title}</strong>
-                    <p>{rule.detail}</p>
-                  </div>
+        </div>
+
+        <div className="rules-group">
+          <h3 className="rules-group-title rules-group-title--bad">מה לא ניתן ליצור</h3>
+          <div className="rules-list rules-list--4">
+            {blockedRules.map((rule) => (
+              <div className="rule-card" key={rule.title}>
+                <span className="rule-icon bad">
+                  <rule.icon size={17} />
+                </span>
+                <div>
+                  <strong>{rule.title}</strong>
+                  <p>{rule.detail}</p>
                 </div>
-              ))}
-            </div>
+              </div>
+            ))}
           </div>
         </div>
       </section>

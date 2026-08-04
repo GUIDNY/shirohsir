@@ -207,3 +207,23 @@ export const Loader = ({ className, ...rest }: IconProps) => (
     <path d="M12 3a9 9 0 1 0 9 9" />
   </Svg>
 );
+
+export const UserCircle = (p: IconProps) => (
+  <Svg {...p}>
+    <circle cx="12" cy="12" r="9" />
+    <circle cx="12" cy="10" r="3" />
+    <path d="M6 18.2c1.2-2.2 3.4-3.4 6-3.4s4.8 1.2 6 3.4" />
+  </Svg>
+);
+
+export const Plus = (p: IconProps) => (
+  <Svg {...p}>
+    <path d="M12 5v14M5 12h14" />
+  </Svg>
+);
+
+export const ChevronDown = (p: IconProps) => (
+  <Svg {...p}>
+    <path d="M6 9l6 6 6-6" />
+  </Svg>
+);

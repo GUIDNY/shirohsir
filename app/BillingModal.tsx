@@ -43,7 +43,7 @@ export function BillingModal({
         return;
       }
 
-      setMessage(`נוספו ${data.credits} קרדיטים ליתרה שלך (מצב הדגמה — בלי חיוב אמיתי).`);
+      setMessage(`נוספו ${data.credits} יחידות ליתרה שלך (מצב הדגמה — בלי חיוב אמיתי).`);
       void account.refreshCredits();
     } catch {
       setError("משהו השתבש, אפשר לנסות שוב.");
@@ -56,7 +56,7 @@ export function BillingModal({
     <div className="billing-overlay" onClick={onClose}>
       <div className="billing-modal" onClick={(event) => event.stopPropagation()}>
         <div className="billing-header">
-          <h3>רכישת קרדיטים</h3>
+          <h3>הוספת יתרה</h3>
           <button aria-label="סגירה" className="billing-close" onClick={onClose} type="button">
             ✕
           </button>
@@ -68,7 +68,7 @@ export function BillingModal({
 
         <div className="billing-tabs">
           <button className={tab === "packs" ? "active" : ""} onClick={() => setTab("packs")} type="button">
-            חבילות קרדיטים
+            חבילות
           </button>
           <button className={tab === "plans" ? "active" : ""} onClick={() => setTab("plans")} type="button">
             מנויים
@@ -82,7 +82,7 @@ export function BillingModal({
           <div className="billing-grid">
             {creditPacks.map((pack) => (
               <div className="billing-card" key={pack.id}>
-                <strong>{pack.credits} קרדיטים</strong>
+                <strong>{pack.credits} יחידות</strong>
                 <span>{pack.label}</span>
                 <div className="billing-price">{pack.priceIls} ש״ח</div>
                 <button
@@ -100,7 +100,7 @@ export function BillingModal({
           <div className="billing-grid">
             {subscriptionPlans.map((plan) => (
               <div className="billing-card" key={plan.id}>
-                <strong>{plan.monthlyCredits} קרדיטים לחודש</strong>
+                <strong>{plan.monthlyCredits} יחידות לחודש</strong>
                 <span>{plan.label}</span>
                 <div className="billing-price">{plan.priceIls} ש״ח / חודש</div>
                 <button
