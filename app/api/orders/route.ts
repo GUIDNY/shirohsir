@@ -95,6 +95,17 @@ function contentTypeForOutputFormat(outputFormat: string) {
   return "audio/mpeg";
 }
 
+function cleanApiKey(value: string | undefined) {
+  if (!value) {
+    return "";
+  }
+
+  const withoutEnvName = value.replace(/^\s*(?:ELEVENLABS_API_KEY|ELEVEN_API_KEY|EVEANLABS_API_KEY|API_KEY|XI_API_KEY)\s*=\s*/i, "");
+  const withoutWrappingQuotes = withoutEnvName.trim().replace(/^["']|["']$/g, "");
+
+  return withoutWrappingQuotes.replace(/[^\x20-\x7e]/g, "");
+}
+
 function arrayBufferToBase64(buffer: ArrayBuffer) {
   const bytes = new Uint8Array(buffer);
   const chunkSize = 0x8000;
@@ -119,12 +130,13 @@ function safeFileName(value: string) {
 }
 
 async function createElevenLabsSong(prompt: string, order: OrderPayload): Promise<OrderResponse> {
-  const apiKey =
+  const apiKey = cleanApiKey(
     process.env.ELEVENLABS_API_KEY ||
-    process.env.ELEVEN_API_KEY ||
-    process.env.EVEANLABS_API_KEY ||
-    process.env.API_KEY ||
-    process.env.XI_API_KEY;
+      process.env.ELEVEN_API_KEY ||
+      process.env.EVEANLABS_API_KEY ||
+      process.env.API_KEY ||
+      process.env.XI_API_KEY,
+  );
   const outputFormat = process.env.ELEVENLABS_OUTPUT_FORMAT || "mp3_44100_128";
   const apiUrl =
     process.env.ELEVENLABS_MUSIC_API_URL ||
@@ -208,6 +220,14 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    throw error;
+    const message = error instanceof Error ? error.message : "Unknown server error";
+
+    return NextResponse.json(
+      {
+        error: "Order request failed before the music provider returned a response",
+        message,
+      },
+      { status: 500 },
+    );
   }
 }
