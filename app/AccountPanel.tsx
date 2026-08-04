@@ -7,10 +7,108 @@ import { BillingModal } from "./BillingModal";
 
 type Mode = "signIn" | "signUp";
 
+function ReferralBox({ account }: { account: ReturnType<typeof useAccount> }) {
+  const { credits, session, refreshCredits } = account;
+  const [open, setOpen] = useState(false);
+  const [copied, setCopied] = useState(false);
+  const [claiming, setClaiming] = useState(false);
+  const [shareMessage, setShareMessage] = useState<string | null>(null);
+
+  if (!credits?.referralCode) {
+    return null;
+  }
+
+  const referralLink =
+    typeof window !== "undefined" ? `${window.location.origin}/?ref=${credits.referralCode}` : "";
+
+  const copyLink = async () => {
+    try {
+      await navigator.clipboard.writeText(referralLink);
+      setCopied(true);
+      window.setTimeout(() => setCopied(false), 2000);
+    } catch {
+      setCopied(false);
+    }
+  };
+
+  const shareOnFacebook = async () => {
+    window.open(
+      `https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(referralLink)}`,
+      "_blank",
+      "noopener,noreferrer,width=600,height=500",
+    );
+
+    if (credits.shareBonusClaimed || !session?.access_token) {
+      return;
+    }
+
+    setClaiming(true);
+    setShareMessage(null);
+
+    try {
+      const response = await fetch("/api/billing/claim-share-bonus", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${session.access_token}` },
+      });
+      const data = await response.json();
+
+      if (response.ok) {
+        setShareMessage(`קיבלת ${data.credits} קרדיט על השיתוף!`);
+        void refreshCredits();
+      }
+    } catch {
+      // silent — the share dialog already opened, the bonus is a nice-to-have
+    } finally {
+      setClaiming(false);
+    }
+  };
+
+  return (
+    <div className="referral-widget">
+      <button className="account-buy" type="button" onClick={() => setOpen((v) => !v)}>
+        הזמנת חברים
+      </button>
+
+      {open && (
+        <div className="referral-box">
+          <span className="referral-title">הזמן חברים, קבל 5 קרדיטים על כל חבר שנרשם</span>
+          <div className="referral-link-row">
+            <input dir="ltr" readOnly value={referralLink} />
+            <button type="button" onClick={() => void copyLink()}>
+              {copied ? "הועתק!" : "העתקה"}
+            </button>
+          </div>
+          {!credits.shareBonusClaimed ? (
+            <button
+              className="referral-share"
+              disabled={claiming}
+              onClick={() => void shareOnFacebook()}
+              type="button"
+            >
+              {claiming && <Loader size={14} />}
+              שיתוף בפייסבוק (+1 קרדיט)
+            </button>
+          ) : (
+            shareMessage === null && <p className="referral-claimed">כבר קיבלת את בונוס השיתוף</p>
+          )}
+          {shareMessage && <p className="referral-claimed">{shareMessage}</p>}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export function AccountPanel({ account }: { account: ReturnType<typeof useAccount> }) {
   const { session, user, authLoading, authError, credits, creditsLoading, signUp, signIn, signOut } = account;
   const [open, setOpen] = useState(false);
-  const [mode, setMode] = useState<Mode>("signIn");
+  const [referralCodeFromUrl] = useState<string | null>(() => {
+    if (typeof window === "undefined") {
+      return null;
+    }
+
+    return new URLSearchParams(window.location.search).get("ref");
+  });
+  const [mode, setMode] = useState<Mode>(() => (referralCodeFromUrl ? "signUp" : "signIn"));
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [submitting, setSubmitting] = useState(false);
@@ -29,7 +127,7 @@ export function AccountPanel({ account }: { account: ReturnType<typeof useAccoun
         setPassword("");
       }
     } else {
-      const { needsEmailConfirmation } = await signUp(email, password);
+      const { needsEmailConfirmation } = await signUp(email, password, referralCodeFromUrl || undefined);
       if (needsEmailConfirmation) {
         setConfirmationSent(true);
         setPassword("");
@@ -63,6 +161,7 @@ export function AccountPanel({ account }: { account: ReturnType<typeof useAccoun
         <button className="account-signout" type="button" onClick={() => void signOut()}>
           התנתקות
         </button>
+        {!credits?.isAdmin && <ReferralBox account={account} />}
         {billingOpen && <BillingModal account={account} onClose={() => setBillingOpen(false)} />}
       </div>
     );
@@ -136,7 +235,13 @@ export function AccountPanel({ account }: { account: ReturnType<typeof useAccoun
                 {mode === "signIn" ? "התחברות" : "יצירת חשבון"}
               </button>
 
-              {mode === "signUp" && <p className="account-hint">נותנים 3 קרדיטים חינם להתחלה.</p>}
+              {mode === "signUp" && (
+                <p className="account-hint">
+                  {referralCodeFromUrl
+                    ? "הוזמנת דרך חבר — תקבל/י קרדיטים נוספים בהרשמה!"
+                    : "נותנים 3 קרדיטים חינם להתחלה."}
+                </p>
+              )}
             </form>
           )}
         </div>

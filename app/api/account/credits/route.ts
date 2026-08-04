@@ -27,6 +27,12 @@ export async function GET(request: NextRequest) {
     .eq("status", "active")
     .maybeSingle();
 
+  const { data: profileRow } = await supabase
+    .from("profiles")
+    .select("referral_code, share_bonus_claimed")
+    .eq("id", user.id)
+    .maybeSingle();
+
   return NextResponse.json(
     {
       email: user.email,
@@ -35,6 +41,8 @@ export async function GET(request: NextRequest) {
       balance: balanceRow?.balance ?? 0,
       updatedAt: balanceRow?.updated_at ?? null,
       subscription: subscriptionRow ?? null,
+      referralCode: profileRow?.referral_code ?? null,
+      shareBonusClaimed: profileRow?.share_bonus_claimed === true,
     },
     { headers: { "Cache-Control": "no-store" } },
   );

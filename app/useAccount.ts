@@ -9,6 +9,8 @@ type AccountCredits = {
   isAdmin: boolean;
   unlimited: boolean;
   subscription: { plan: string; status: string } | null;
+  referralCode: string | null;
+  shareBonusClaimed: boolean;
 };
 
 export function useAccount() {
@@ -43,6 +45,8 @@ export function useAccount() {
         isAdmin: data.isAdmin === true,
         unlimited: data.unlimited === true,
         subscription: data.subscription,
+        referralCode: data.referralCode ?? null,
+        shareBonusClaimed: data.shareBonusClaimed === true,
       });
     } catch {
       setCredits(null);
@@ -68,9 +72,13 @@ export function useAccount() {
     return () => listener.subscription.unsubscribe();
   }, [refreshCredits]);
 
-  const signUp = useCallback(async (email: string, password: string) => {
+  const signUp = useCallback(async (email: string, password: string, referralCode?: string) => {
     setAuthError(null);
-    const { data, error } = await supabase.auth.signUp({ email, password });
+    const { data, error } = await supabase.auth.signUp({
+      email,
+      password,
+      options: referralCode ? { data: { referral_code: referralCode } } : undefined,
+    });
 
     if (error) {
       setAuthError(error.message);

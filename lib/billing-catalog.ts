@@ -33,3 +33,14 @@ export const subscriptionPlans: SubscriptionPlan[] = [
 // Cap total lifetime dummy-granted credits per account so this can't be
 // abused as a free-credits faucet on the live site before checkout exists.
 export const DUMMY_BILLING_CAP_CREDITS = 300;
+
+// One-time bonus for sharing on Facebook. Not verified server-side (that
+// would need Facebook app review) — trust-based like the "click to open
+// the share dialog" pattern most small apps use, bounded by being
+// claimable exactly once per account (see profiles.share_bonus_claimed).
+export const SHARE_BONUS_CREDITS = 1;
+
+// Referral bonuses (granted by the handle_new_user DB trigger, not here —
+// this file isn't imported by SQL, kept for documentation/consistency):
+// +5 credits to the referrer (capped at 10 successful referrals lifetime),
+// +2 extra credits to the referred signup on top of the normal signup bonus.
