@@ -14,6 +14,7 @@ type OrderPayload = {
   vocalist: string;
   languageRegister: string;
   lyricStructure: string;
+  pronunciation: string;
   story: string;
   mustInclude: string;
   avoid: string;
@@ -111,6 +112,7 @@ const initialOrder: OrderPayload = {
   vocalist: "זמרת ישראלית חמה",
   languageRegister: "עברית ישראלית מדוברת",
   lyricStructure: "בית קצר ופזמון קליט",
+  pronunciation: "",
   story: "",
   mustInclude: "",
   avoid: "",
@@ -472,6 +474,14 @@ export default function Home() {
                     value={order.customerName}
                     onChange={(event) => setField("customerName", event.target.value)}
                     placeholder="השם שלך"
+                  />
+                </label>
+                <label className="wide">
+                  הגייה לשירה
+                  <input
+                    value={order.pronunciation}
+                    onChange={(event) => setField("pronunciation", event.target.value)}
+                    placeholder="כתיב עברי לשם הראשי. למשל: SkiShare = סקי שייר"
                   />
                 </label>
                 <label className="wide">

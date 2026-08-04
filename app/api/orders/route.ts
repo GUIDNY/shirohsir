@@ -9,6 +9,7 @@ type OrderPayload = {
   vocalist?: string;
   languageRegister?: string;
   lyricStructure?: string;
+  pronunciation?: string;
   story?: string;
   mustInclude?: string;
   avoid?: string;
@@ -56,15 +57,6 @@ function text(value: unknown) {
   return typeof value === "string" ? value.trim().slice(0, 1200) : "";
 }
 
-const songTypeDirections: Record<string, string> = {
-  gift:
-    "Personal gift song. Warm, specific, emotional without being sentimental or embarrassing. Address the subject naturally in second person when it fits.",
-  business:
-    "Short brand song or jingle. Clear hook, polished commercial Hebrew, memorable phrase, no hard-sell cliches, suitable for a social video.",
-  graduation:
-    "End-of-year or graduation song. Inclusive plural Hebrew, celebratory and nostalgic, easy for a group to sing along to.",
-};
-
 const styleDirections: Record<string, string> = {
   "פופ ישראלי עכשווי ונקי":
     "Contemporary Israeli pop, warm piano/guitar, light electronic drums, polished radio feel, 92-108 BPM.",
@@ -109,46 +101,162 @@ const languageDirections: Record<string, string> = {
     "Use simple, clear Hebrew that children can sing. Short sentences, concrete images, no babyish wording.",
 };
 
-const lyricStructureDirections: Record<string, string> = {
-  "בית קצר ופזמון קליט":
-    "20-second structure: two short verse lines, then a four-line chorus with one repeated hook.",
-  "פזמון פתיחה ישר לעניין":
-    "20-second structure: start immediately with the hook, then add two personal detail lines, then repeat the hook.",
-  "ג'ינגל עם סלוגן":
-    "20-second structure: brand/subject name in the first line, benefit or emotion in the second, slogan twice as the hook.",
-  "ברכה אישית מרגשת":
-    "20-second structure: one intimate opening line, two concrete memories/details, one heartfelt wish as the hook.",
-};
-
 function directionFor(map: Record<string, string>, value: unknown) {
   const key = text(value);
 
   return map[key] || key || "not specified";
 }
 
-function buildMusicPrompt(order: OrderPayload) {
-  const structure = directionFor(lyricStructureDirections, order.lyricStructure);
-  const lines = [
-    "Create a 20-second original song with Hebrew lyrics for a paying customer.",
-    "The Hebrew is the highest priority: write idiomatic modern Israeli Hebrew, not translated English. Use correct right-to-left Hebrew words only, no transliteration, no niqqud, no English lyric fragments unless the customer explicitly provided them.",
-    "Make the lyrics singable: short lines, clear stresses, natural word order, no forced rhymes, no awkward gender shifts, no inflated phrases like generic AI poetry.",
-    "Use concrete personal details from the customer story. Prefer simple emotional images over abstract compliments.",
-    "Because the output is 20 seconds, keep the song compact and complete. Do not create a long intro.",
-    `Song type direction: ${directionFor(songTypeDirections, order.songType)}`,
-    `Subject: ${text(order.recipient)}`,
-    `Occasion or campaign goal: ${text(order.occasion)}`,
-    `Music style direction: ${directionFor(styleDirections, order.style)}`,
-    `Mood direction: ${directionFor(moodDirections, order.mood)}`,
-    `Vocal direction: ${directionFor(vocalistDirections, order.vocalist)}`,
-    `Hebrew register: ${directionFor(languageDirections, order.languageRegister)}`,
-    `Lyric structure: ${structure}`,
-    `Customer story: ${text(order.story)}`,
-    `Must include: ${text(order.mustInclude) || "none"}`,
-    `Avoid: ${text(order.avoid) || "none"}`,
-    "Final safety rule: write original lyrics and melody only. Do not imitate a named artist, existing song, protected voice, melody, or copyrighted lyrics.",
-  ];
+function line(value: string, fallback = "") {
+  return (value || fallback).replace(/\s+/g, " ").trim().slice(0, 58);
+}
 
-  return lines.join("\n");
+function firstSentence(value: unknown) {
+  const clean = text(value).replace(/\s+/g, " ");
+  const [sentence] = clean.split(/[.!?。！？\n]/);
+
+  return line(sentence, "יש סיפור קטן שכולם זוכרים");
+}
+
+function storyLyricLine(order: OrderPayload) {
+  const story = text(order.story);
+  const occasion = text(order.occasion);
+  const source = `${story} ${occasion}`;
+
+  if (/סקי|שלג|גולש|גולשים|חורף|עונה/i.test(source)) {
+    return "השלג כבר קורא, וכולם מוכנים";
+  }
+
+  if (/משפחה|חברים|חברות|אוהב|אוהבת|אהבה/i.test(source)) {
+    return "עם כל האנשים שאוהבים אותך";
+  }
+
+  if (/עסק|מותג|לקוח|לקוחות|קמפיין|פרסום|משרד|משרדים/i.test(source)) {
+    return "המסר כבר ברור, הקצב באוויר";
+  }
+
+  if (/סיום|שנה|כיתה|שכבה|גן|בית ספר|טקס/i.test(source)) {
+    return "צעד אחר צעד גדלנו ביחד";
+  }
+
+  const raw = firstSentence(story);
+
+  if (/[A-Za-z]/.test(raw) || raw.split(/\s+/).some((word) => word.length > 10)) {
+    return "הרגע הזה נשאר איתנו בלב";
+  }
+
+  return raw;
+}
+
+function subjectForLyrics(order: OrderPayload) {
+  const pronunciation = text(order.pronunciation);
+
+  return line(pronunciation || text(order.recipient), "השמחה הזאת");
+}
+
+function occasionHook(order: OrderPayload) {
+  const occasion = text(order.occasion);
+
+  if (/סקי|שלג|חורף|גולש|גולשים/i.test(occasion)) {
+    return "העונה מתחילה";
+  }
+
+  if (/יום הולדת|הולדת|birthday/i.test(occasion)) {
+    return "מזל טוב";
+  }
+
+  if (/חתונ|אהבה|זוג/i.test(occasion)) {
+    return "לחיי האהבה";
+  }
+
+  if (/סיום|שנה|טקס|בית ספר|גן/i.test(occasion)) {
+    return "איזו שנה יפה";
+  }
+
+  if (/עסק|מותג|קמפיין|פרסום|ג'ינגל|ג׳ינגל|גינגל/i.test(occasion)) {
+    return "זה השם שנשאר";
+  }
+
+  return line(occasion, "הרגע הזה");
+}
+
+function mustIncludeLine(order: OrderPayload) {
+  const include = text(order.mustInclude);
+
+  if (!include) {
+    return "";
+  }
+
+  if (/פותחים עונה/i.test(include) && /משרד|משרדים/i.test(include)) {
+    return "פותחים עונה עם כל הצוותים";
+  }
+
+  return line(include);
+}
+
+function buildHebrewLyrics(order: OrderPayload) {
+  const subject = subjectForLyrics(order);
+  const hook = occasionHook(order);
+  const detail = storyLyricLine(order);
+  const include = mustIncludeLine(order);
+
+  if (order.songType === "business") {
+    return [
+      "[Hook]",
+      `${subject}, ${hook}`,
+      include || "קל לזכור, נעים לשמוע",
+      "[Verse]",
+      `${detail}`,
+      "[Hook]",
+      `${subject}, ${hook}`,
+    ].join("\n");
+  }
+
+  if (order.songType === "graduation") {
+    return [
+      "[Verse]",
+      `${hook}, כולנו כאן ביחד`,
+      `${detail}`,
+      "[Chorus]",
+      include || "כל צעד קטן הפך לזיכרון",
+      "שרים בקול, עם לב גדול",
+      `${subject}, היום הזה שלנו`,
+    ].join("\n");
+  }
+
+  if (order.lyricStructure === "פזמון פתיחה ישר לעניין") {
+    return [
+      "[Chorus]",
+      `${hook} ${subject}`,
+      include || "הלב שלנו שר אליך",
+      "[Verse]",
+      `${detail}`,
+      "[Chorus]",
+      `${hook} ${subject}`,
+    ].join("\n");
+  }
+
+  if (order.lyricStructure === "ברכה אישית מרגשת") {
+    return [
+      "[Verse]",
+      `${subject}, היום חושבים עליך`,
+      `${detail}`,
+      "[Chorus]",
+      include || "שיהיה לך אור בכל הדרך",
+      `${hook} מכל הלב`,
+      "אנחנו כאן איתך",
+    ].join("\n");
+  }
+
+  return [
+    "[Verse]",
+    `${subject}, היום הזה כולו שלך`,
+    `${detail}`,
+    "[Chorus]",
+    include || `${hook}, שרים מכל הלב`,
+    "רגע קטן הופך לשיר",
+    `${subject}, האור שלך נשאר איתנו`,
+  ].join("\n");
 }
 
 function envNumber(name: string, fallback: number, min: number, max: number) {
@@ -208,7 +316,7 @@ function safeFileName(value: string) {
   );
 }
 
-async function createElevenLabsSong(prompt: string, order: OrderPayload): Promise<OrderResponse> {
+async function createElevenLabsSong(order: OrderPayload): Promise<OrderResponse> {
   const apiKey = cleanApiKey(
     process.env.ELEVENLABS_API_KEY ||
       process.env.ELEVEN_API_KEY ||
@@ -221,7 +329,26 @@ async function createElevenLabsSong(prompt: string, order: OrderPayload): Promis
     process.env.ELEVENLABS_MUSIC_API_URL ||
     `https://api.elevenlabs.io/v1/music/stream?output_format=${encodeURIComponent(outputFormat)}`;
   const musicLengthMs = envNumber("ELEVENLABS_MUSIC_LENGTH_MS", 20000, 3000, 600000);
-  const modelId = process.env.ELEVENLABS_MUSIC_MODEL_ID || "music_v1";
+  const modelId = process.env.ELEVENLABS_MUSIC_MODEL_ID || "music_v2";
+  const lyrics = buildHebrewLyrics(order);
+  const positiveStyles = [
+    directionFor(styleDirections, order.style),
+    directionFor(moodDirections, order.mood),
+    directionFor(vocalistDirections, order.vocalist),
+    directionFor(languageDirections, order.languageRegister),
+    "clear modern Israeli Hebrew pronunciation",
+    "short singable Hebrew lines",
+    "compact 20 second song with immediate vocals",
+  ];
+  const negativeStyles = [
+    "gibberish Hebrew",
+    "transliterated Hebrew",
+    "English lyrics",
+    "fake Hebrew words",
+    "overly dramatic AI poetry",
+    "imitating a known artist",
+    "long instrumental intro",
+  ];
 
   if (!apiKey) {
     return {
@@ -229,7 +356,7 @@ async function createElevenLabsSong(prompt: string, order: OrderPayload): Promis
       provider: "elevenlabs-demo",
       status: "missing_elevenlabs_api_key",
       mode: "demo",
-      promptPreview: prompt.slice(0, 420),
+      promptPreview: lyrics.slice(0, 420),
     };
   }
 
@@ -240,10 +367,18 @@ async function createElevenLabsSong(prompt: string, order: OrderPayload): Promis
       "xi-api-key": apiKey,
     },
     body: JSON.stringify({
-      prompt,
-      music_length_ms: musicLengthMs,
+      composition_plan: {
+        chunks: [
+          {
+            text: lyrics,
+            duration_ms: musicLengthMs,
+            positive_styles: positiveStyles,
+            negative_styles: negativeStyles,
+            context_adherence: "high",
+          },
+        ],
+      },
       model_id: modelId,
-      force_instrumental: false,
     }),
   });
 
@@ -264,7 +399,7 @@ async function createElevenLabsSong(prompt: string, order: OrderPayload): Promis
     provider: "elevenlabs",
     status: "audio_ready",
     mode: "live",
-    promptPreview: prompt.slice(0, 420),
+    promptPreview: lyrics.slice(0, 420),
     audioDataUrl: `data:${audioContentType};base64,${base64}`,
     audioContentType,
     downloadFileName: `${safeFileName(text(order.recipient))}.mp3`,
@@ -282,9 +417,8 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  const prompt = buildMusicPrompt(order);
   try {
-    const response = await createElevenLabsSong(prompt, order);
+    const response = await createElevenLabsSong(order);
 
     return NextResponse.json(response);
   } catch (error) {
