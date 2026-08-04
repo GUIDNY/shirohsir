@@ -1,4 +1,4 @@
-import { access, cp, mkdir, rm } from "node:fs/promises";
+import { access, cp, mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import { resolve } from "node:path";
 import type { Plugin } from "vite";
 
@@ -28,9 +28,19 @@ export function sites(): Plugin {
       const outputDirectory = resolve(root, "dist", ".openai");
       const hostingConfig = resolve(root, ".openai", "hosting.json");
       const drizzleSource = resolve(root, "drizzle");
+      const wranglerConfig = resolve(root, "dist", "server", "wrangler.json");
 
       await rm(outputDirectory, { recursive: true, force: true });
       await mkdir(outputDirectory, { recursive: true });
+
+      if (await exists(wranglerConfig)) {
+        const wrangler = JSON.parse(await readFile(wranglerConfig, "utf8"));
+
+        if (Array.isArray(wrangler.compatibility_flags) && wrangler.compatibility_flags.length === 0) {
+          delete wrangler.compatibility_flags;
+          await writeFile(wranglerConfig, `${JSON.stringify(wrangler)}\n`);
+        }
+      }
 
       if (await exists(hostingConfig)) {
         await cp(hostingConfig, resolve(outputDirectory, "hosting.json"));
