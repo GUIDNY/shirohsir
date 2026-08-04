@@ -300,10 +300,13 @@ export default function Home() {
         </div>
 
         <div className="studio-visual" aria-label="תצוגת שיר">
-          <div className="cover-art">
-            <span className="pulse-dot" />
-            <span className="cover-title">השיר של נועה</span>
-            <span className="cover-subtitle">פופ ישראלי · 02:48</span>
+          <div className="sleeve-panel">
+            <span className="catalog-code">SR·01</span>
+            <div className="disc-label">
+              <span className="pulse-dot" />
+              <span className="cover-title">השיר של נועה</span>
+              <span className="cover-subtitle">פופ ישראלי · 02:48</span>
+            </div>
             <div className="waveform" aria-hidden="true">
               {Array.from({ length: 42 }).map((_, index) => (
                 <span key={index} style={{ "--bar": `${18 + ((index * 17) % 62)}%` } as CSSProperties} />
