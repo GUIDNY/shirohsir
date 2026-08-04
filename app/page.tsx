@@ -27,6 +27,9 @@ type ApiResult = {
   status: string;
   mode: "demo" | "live";
   promptPreview: string;
+  audioDataUrl?: string;
+  audioContentType?: string;
+  downloadFileName?: string;
 };
 
 type IconProps = {
@@ -485,6 +488,16 @@ export default function Home() {
                     <span>
                       מצב: {result.mode === "live" ? "מחובר לספק" : "דמו"} · ספק: {result.provider}
                     </span>
+                    {result.audioDataUrl && (
+                      <div className="audio-delivery">
+                        <audio controls src={result.audioDataUrl}>
+                          הדפדפן שלך לא תומך בנגן אודיו.
+                        </audio>
+                        <a download={result.downloadFileName || "custom-song.mp3"} href={result.audioDataUrl}>
+                          להורדת השיר
+                        </a>
+                      </div>
+                    )}
                   </div>
                 </div>
               )}
@@ -527,7 +540,7 @@ export default function Home() {
           <h2>מוכן לספק מוזיקה, אבל לא תלוי ב־Suno לא רשמי.</h2>
           <p>
             ה־endpoint המקומי מקבל את ההזמנה, בונה פרומפט מסודר ומחזיר Job ID.
-            כשיהיה לך ספק מורשה, מחליפים את כתובת ה־API והמפתח בסביבה.
+            כשקיים מפתח ElevenLabs בסביבה, הוא מחזיר גם קובץ MP3 לניגון והורדה.
           </p>
         </div>
         <div className="api-grid">

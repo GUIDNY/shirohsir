@@ -16,6 +16,26 @@ type OrderPayload = {
   consent?: boolean;
 };
 
+type OrderResponse = {
+  orderId: string;
+  provider: string;
+  status: string;
+  mode: "demo" | "live";
+  promptPreview: string;
+  audioDataUrl?: string;
+  audioContentType?: string;
+  downloadFileName?: string;
+};
+
+class MusicProviderError extends Error {
+  constructor(
+    public providerStatus: number,
+    public providerMessage: string,
+  ) {
+    super("ElevenLabs music request failed");
+  }
+}
+
 const requiredFields: Array<keyof OrderPayload> = [
   "recipient",
   "occasion",
@@ -34,7 +54,9 @@ function text(value: unknown) {
 
 function buildMusicPrompt(order: OrderPayload) {
   const lines = [
-    "Create an original Hebrew song for a paying customer.",
+    "Create an original Hebrew song in Hebrew for a paying customer.",
+    "Use natural Hebrew lyrics with correct right-to-left wording. Do not transliterate Hebrew into English.",
+    "Make the song complete, catchy, emotionally clear, and suitable for delivery to a customer.",
     `Song type: ${text(order.songType)}`,
     `Subject: ${text(order.recipient)}`,
     `Occasion or campaign goal: ${text(order.occasion)}`,
@@ -50,6 +72,114 @@ function buildMusicPrompt(order: OrderPayload) {
   return lines.join("\n");
 }
 
+function envNumber(name: string, fallback: number, min: number, max: number) {
+  const raw = process.env[name];
+  const parsed = raw ? Number(raw) : NaN;
+
+  if (!Number.isFinite(parsed)) {
+    return fallback;
+  }
+
+  return Math.min(Math.max(Math.round(parsed), min), max);
+}
+
+function contentTypeForOutputFormat(outputFormat: string) {
+  if (outputFormat.startsWith("wav")) {
+    return "audio/wav";
+  }
+
+  if (outputFormat.startsWith("pcm")) {
+    return "audio/wav";
+  }
+
+  return "audio/mpeg";
+}
+
+function arrayBufferToBase64(buffer: ArrayBuffer) {
+  const bytes = new Uint8Array(buffer);
+  const chunkSize = 0x8000;
+  let binary = "";
+
+  for (let index = 0; index < bytes.length; index += chunkSize) {
+    const chunk = bytes.subarray(index, index + chunkSize);
+    binary += String.fromCharCode(...chunk);
+  }
+
+  return btoa(binary);
+}
+
+function safeFileName(value: string) {
+  return (
+    value
+      .trim()
+      .replace(/[\\/:*?"<>|]+/g, "-")
+      .replace(/\s+/g, "-")
+      .slice(0, 80) || "custom-song"
+  );
+}
+
+async function createElevenLabsSong(prompt: string, order: OrderPayload): Promise<OrderResponse> {
+  const apiKey =
+    process.env.ELEVENLABS_API_KEY ||
+    process.env.ELEVEN_API_KEY ||
+    process.env.EVEANLABS_API_KEY ||
+    process.env.API_KEY ||
+    process.env.XI_API_KEY;
+  const outputFormat = process.env.ELEVENLABS_OUTPUT_FORMAT || "mp3_44100_128";
+  const apiUrl =
+    process.env.ELEVENLABS_MUSIC_API_URL ||
+    `https://api.elevenlabs.io/v1/music/stream?output_format=${encodeURIComponent(outputFormat)}`;
+  const musicLengthMs = envNumber("ELEVENLABS_MUSIC_LENGTH_MS", 60000, 3000, 600000);
+  const modelId = process.env.ELEVENLABS_MUSIC_MODEL_ID || "music_v1";
+
+  if (!apiKey) {
+    return {
+      orderId: `demo_${Date.now()}`,
+      provider: "elevenlabs-demo",
+      status: "missing_elevenlabs_api_key",
+      mode: "demo",
+      promptPreview: prompt.slice(0, 420),
+    };
+  }
+
+  const providerResponse = await fetch(apiUrl, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "xi-api-key": apiKey,
+    },
+    body: JSON.stringify({
+      prompt,
+      music_length_ms: musicLengthMs,
+      model_id: modelId,
+      force_instrumental: false,
+    }),
+  });
+
+  if (!providerResponse.ok) {
+    const providerError = await providerResponse.text();
+
+    throw new MusicProviderError(providerResponse.status, providerError.slice(0, 500));
+  }
+
+  const audioBuffer = await providerResponse.arrayBuffer();
+  const audioContentType =
+    providerResponse.headers.get("content-type") || contentTypeForOutputFormat(outputFormat);
+  const songId = providerResponse.headers.get("song-id");
+  const base64 = arrayBufferToBase64(audioBuffer);
+
+  return {
+    orderId: songId || `eleven_${Date.now()}`,
+    provider: "elevenlabs",
+    status: "audio_ready",
+    mode: "live",
+    promptPreview: prompt.slice(0, 420),
+    audioDataUrl: `data:${audioContentType};base64,${base64}`,
+    audioContentType,
+    downloadFileName: `${safeFileName(text(order.recipient))}.mp3`,
+  };
+}
+
 export async function POST(request: NextRequest) {
   const order = (await request.json()) as OrderPayload;
   const missing = requiredFields.filter((field) => !text(order[field]));
@@ -62,51 +192,22 @@ export async function POST(request: NextRequest) {
   }
 
   const prompt = buildMusicPrompt(order);
-  const apiUrl = process.env.SUNO_API_URL;
-  const apiKey = process.env.SUNO_API_KEY;
-  const providerName = process.env.MUSIC_PROVIDER_NAME || "demo-adapter";
+  try {
+    const response = await createElevenLabsSong(prompt, order);
 
-  if (!apiUrl || !apiKey) {
-    return NextResponse.json({
-      orderId: `demo_${Date.now()}`,
-      provider: providerName,
-      status: "queued_without_external_api",
-      mode: "demo",
-      promptPreview: prompt.slice(0, 420),
-    });
+    return NextResponse.json(response);
+  } catch (error) {
+    if (error instanceof MusicProviderError) {
+      return NextResponse.json(
+        {
+          error: error.message,
+          providerStatus: error.providerStatus,
+          providerMessage: error.providerMessage,
+        },
+        { status: 502 },
+      );
+    }
+
+    throw error;
   }
-
-  const providerResponse = await fetch(apiUrl, {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${apiKey}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({
-      prompt,
-      metadata: {
-        source: "personal-song-order-site",
-        customerName: text(order.customerName),
-        email: text(order.email),
-        phone: text(order.phone),
-      },
-    }),
-  });
-
-  if (!providerResponse.ok) {
-    return NextResponse.json(
-      { error: "Music provider request failed", providerStatus: providerResponse.status },
-      { status: 502 },
-    );
-  }
-
-  const providerData = await providerResponse.json();
-
-  return NextResponse.json({
-    orderId: providerData.id || providerData.taskId || `live_${Date.now()}`,
-    provider: providerName,
-    status: providerData.status || "submitted",
-    mode: "live",
-    promptPreview: prompt.slice(0, 420),
-  });
 }

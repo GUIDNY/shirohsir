@@ -672,6 +672,29 @@ textarea:focus {
   color: #2d6259;
 }
 
+.audio-delivery {
+  display: grid;
+  gap: 10px;
+  margin-top: 12px;
+}
+
+.audio-delivery audio {
+  width: min(100%, 520px);
+}
+
+.audio-delivery a {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: fit-content;
+  min-height: 38px;
+  padding: 0 12px;
+  border-radius: 8px;
+  background: #181512;
+  color: #fffdf8;
+  font-weight: 900;
+}
+
 .order-sidebar {
   position: sticky;
   top: 92px;
