@@ -263,6 +263,66 @@ function buildHebrewLyrics(order: OrderPayload) {
   ].join("\n");
 }
 
+type NakdanToken = {
+  nakdan?: { options?: Array<{ w?: string }>; sep?: boolean };
+  str?: string;
+};
+
+async function addNiqqudToLine(line: string): Promise<string> {
+  const trimmed = line.trim();
+
+  // Structure tags like [Verse]/[Chorus]/[Hook] are ElevenLabs formatting,
+  // not Hebrew lyrics — leave them untouched.
+  if (!trimmed || /^\[[^\]]+\]$/.test(trimmed) || !/[א-ת]/.test(trimmed)) {
+    return line;
+  }
+
+  try {
+    const response = await fetch("https://nakdan-u1-0.loadbalancer.dicta.org.il/api", {
+      method: "POST",
+      headers: { "Content-Type": "application/json;charset=UTF-8" },
+      body: JSON.stringify({
+        task: "nakdan",
+        genre: "modern",
+        data: line,
+        addmorph: false,
+        keepqq: false,
+        nodageshdefmem: false,
+        patachma: false,
+        keepmetagim: false,
+        useTokenization: true,
+      }),
+      signal: AbortSignal.timeout(6000),
+    });
+
+    if (!response.ok) {
+      return line;
+    }
+
+    const payload = (await response.json()) as { data?: NakdanToken[] };
+
+    if (!payload.data || payload.data.length === 0) {
+      return line;
+    }
+
+    return payload.data
+      .map((token) => token.nakdan?.options?.[0]?.w || token.str || "")
+      .join("")
+      .replace(/\|/g, "");
+  } catch {
+    // Diacritization is a quality nice-to-have, not required — never let a
+    // slow/unreachable Nakdan API block or break song generation.
+    return line;
+  }
+}
+
+async function addNiqqud(lyrics: string): Promise<string> {
+  const lines = lyrics.split("\n");
+  const vocalized = await Promise.all(lines.map((line) => addNiqqudToLine(line)));
+
+  return vocalized.join("\n");
+}
+
 function envNumber(name: string, fallback: number, min: number, max: number) {
   const raw = process.env[name];
   const parsed = raw ? Number(raw) : NaN;
@@ -364,6 +424,14 @@ async function createElevenLabsSong(order: OrderPayload): Promise<OrderResponse>
     };
   }
 
+  // Hebrew without niqqud is genuinely ambiguous for a singing model — the
+  // same letters can be several different words depending on the vowels.
+  // Dicta's Nakdan (a free, established Hebrew diacritization service) adds
+  // niqqud before we hand the lyrics to ElevenLabs. Falls back to the plain
+  // text line-by-line on any failure, so a slow/unreachable Nakdan never
+  // blocks or breaks song generation.
+  const vocalizedLyrics = await addNiqqud(lyrics);
+
   const providerResponse = await fetch(apiUrl, {
     method: "POST",
     headers: {
@@ -374,7 +442,7 @@ async function createElevenLabsSong(order: OrderPayload): Promise<OrderResponse>
       composition_plan: {
         chunks: [
           {
-            text: lyrics,
+            text: vocalizedLyrics,
             duration_ms: musicLengthMs,
             positive_styles: positiveStyles,
             negative_styles: negativeStyles,
@@ -403,7 +471,7 @@ async function createElevenLabsSong(order: OrderPayload): Promise<OrderResponse>
     provider: "elevenlabs",
     status: "audio_ready",
     mode: "live",
-    promptPreview: lyrics.slice(0, 420),
+    promptPreview: vocalizedLyrics.slice(0, 420),
     audioDataUrl: `data:${audioContentType};base64,${base64}`,
     audioContentType,
     downloadFileName: `${safeFileName(text(order.recipient))}.mp3`,
