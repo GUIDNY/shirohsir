@@ -1,6 +1,7 @@
 @import "tailwindcss";
 
 :root {
+  color-scheme: light;
   --cream-50: #fcfaf6;
   --cream-100: #f6eedc;
   --cream-200: #ead9b6;
@@ -28,26 +29,9 @@
   --foreground: var(--brown-900);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --cream-50: #1c1712;
-    --cream-100: #241d16;
-    --cream-200: #3a2d22;
-    --cream-300: #4a3a2a;
-    --brown-800: #efe3d3;
-    --brown-900: #f8f1e6;
-    --brown-950: #ffffff;
-    --gold: #dcae5f;
-    --gold-soft: #3a2c14;
-    --good-soft: #16281f;
-    --bad-soft: #2e1815;
-    --line: rgba(240, 227, 205, 0.12);
-    --shadow-elegant: 0 16px 30px -12px rgba(0, 0, 0, 0.45);
-    --shadow-glass: 0 6px 20px rgba(0, 0, 0, 0.3);
-    --background: var(--cream-50);
-    --foreground: var(--brown-900);
-  }
-}
+/* Intentionally no @media (prefers-color-scheme: dark) override —
+   this site always stays on the light/bright palette above,
+   regardless of the visitor's OS or browser dark-mode setting. */
 
 @theme inline {
   --color-background: var(--background);
