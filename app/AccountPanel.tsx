@@ -3,6 +3,7 @@
 import { FormEvent, useState } from "react";
 import { useAccount } from "./useAccount";
 import { Loader } from "./icons";
+import { BillingModal } from "./BillingModal";
 
 type Mode = "signIn" | "signUp";
 
@@ -14,6 +15,7 @@ export function AccountPanel({ account }: { account: ReturnType<typeof useAccoun
   const [password, setPassword] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [confirmationSent, setConfirmationSent] = useState(false);
+  const [billingOpen, setBillingOpen] = useState(false);
 
   const submit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -53,9 +55,15 @@ export function AccountPanel({ account }: { account: ReturnType<typeof useAccoun
             {creditsLoading ? "…" : credits?.isAdmin ? "∞ מנהל" : `${credits?.balance ?? 0} קרדיטים`}
           </span>
         </div>
+        {!credits?.isAdmin && (
+          <button className="account-buy" type="button" onClick={() => setBillingOpen(true)}>
+            רכישת קרדיטים
+          </button>
+        )}
         <button className="account-signout" type="button" onClick={() => void signOut()}>
           התנתקות
         </button>
+        {billingOpen && <BillingModal account={account} onClose={() => setBillingOpen(false)} />}
       </div>
     );
   }
