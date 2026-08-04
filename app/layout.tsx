@@ -1,24 +1,11 @@
 import type { Metadata } from "next";
-import { Frank_Ruhl_Libre, Heebo, IBM_Plex_Mono } from "next/font/google";
+import { Heebo } from "next/font/google";
 import "./globals.css";
 
 const heebo = Heebo({
   variable: "--font-heebo",
   subsets: ["hebrew", "latin"],
-  display: "swap",
-});
-
-const frankRuhlLibre = Frank_Ruhl_Libre({
-  variable: "--font-display",
-  subsets: ["hebrew", "latin"],
-  weight: ["500", "600", "700"],
-  display: "swap",
-});
-
-const ibmPlexMono = IBM_Plex_Mono({
-  variable: "--font-mono",
-  subsets: ["latin"],
-  weight: ["500", "600"],
+  weight: ["300", "400", "500", "700", "900"],
   display: "swap",
 });
 
@@ -64,9 +51,7 @@ export default function RootLayout({
 }>) {
   return (
     <html dir="rtl" lang="he">
-      <body className={`${heebo.variable} ${frankRuhlLibre.variable} ${ibmPlexMono.variable} antialiased`}>
-        {children}
-      </body>
+      <body className={`${heebo.variable} antialiased`}>{children}</body>
     </html>
   );
 }
