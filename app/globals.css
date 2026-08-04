@@ -268,10 +268,10 @@ a {
   min-height: 44px;
   padding: 0 20px;
   border-radius: 999px;
-  background: var(--brown-900);
+  background: linear-gradient(90deg, var(--burgundy-700), var(--burgundy-900));
   color: var(--cream-50);
   font-weight: 600;
-  box-shadow: var(--shadow-elegant);
+  box-shadow: var(--shadow-glow);
   transition: transform 0.25s ease;
 }
 
@@ -973,7 +973,7 @@ h3 {
 }
 
 .steps button.active span {
-  background: var(--brown-900);
+  background: var(--burgundy-700);
   color: var(--cream-50);
 }
 
@@ -1179,7 +1179,7 @@ textarea:focus {
 
 .pay-button {
   width: 100%;
-  background: linear-gradient(90deg, var(--brown-900), var(--brown-950));
+  background: linear-gradient(90deg, var(--burgundy-700), var(--burgundy-950));
 }
 
 .pay-button:disabled {
@@ -1256,7 +1256,7 @@ textarea:focus {
   min-height: 38px;
   padding: 0 14px;
   border-radius: 999px;
-  background: var(--brown-900);
+  background: linear-gradient(90deg, var(--burgundy-700), var(--burgundy-900));
   color: var(--cream-50);
   font-weight: 600;
 }
@@ -1311,9 +1311,10 @@ textarea:focus {
 
 .voice-engine-card {
   padding: 18px;
+  border: 1px solid var(--line);
   border-radius: 18px;
-  background: linear-gradient(160deg, var(--burgundy-900), var(--brown-900));
-  color: var(--cream-100);
+  background: var(--cream-50);
+  color: var(--brown-900);
   box-shadow: var(--shadow-glass);
 }
 
@@ -1328,12 +1329,13 @@ textarea:focus {
   display: flex;
   flex-direction: column;
   gap: 2px;
+  color: var(--brown-800);
   font-size: 0.78rem;
-  opacity: 0.6;
+  opacity: 0.65;
 }
 
 .voice-engine-name strong {
-  color: var(--cream-50);
+  color: var(--brown-900);
   font-size: 0.98rem;
   font-weight: 600;
   opacity: 1;
@@ -1345,15 +1347,15 @@ textarea:focus {
   gap: 6px;
   padding: 4px 10px;
   border-radius: 999px;
-  background: rgba(47, 125, 92, 0.22);
-  color: #7fd6ac;
+  background: var(--good-soft);
+  color: var(--good);
   font-size: 0.76rem;
   font-weight: 600;
 }
 
 .connected-pill.offline {
-  background: rgba(255, 255, 255, 0.1);
-  color: var(--cream-100);
+  background: var(--cream-100);
+  color: var(--brown-800);
   opacity: 0.7;
 }
 
@@ -1366,8 +1368,8 @@ textarea:focus {
 
 .voice-engine-label {
   margin-bottom: 6px;
-  color: var(--cream-100);
-  opacity: 0.55;
+  color: var(--brown-800);
+  opacity: 0.65;
 }
 
 .voice-engine-stat {
@@ -1379,13 +1381,13 @@ textarea:focus {
 }
 
 .voice-engine-stat span {
-  color: var(--cream-100);
+  color: var(--brown-800);
   font-size: 1rem;
-  opacity: 0.45;
+  opacity: 0.5;
 }
 
 .voice-engine-stat strong {
-  color: var(--cream-50);
+  color: var(--burgundy-700);
   font-size: 2.1rem;
   font-weight: 700;
 }
@@ -1398,7 +1400,7 @@ textarea:focus {
 }
 
 .voice-engine-track {
-  background: rgba(255, 255, 255, 0.12);
+  background: var(--cream-200);
 }
 
 .voice-engine-grid {
@@ -1407,21 +1409,21 @@ textarea:focus {
   gap: 10px;
   margin: 16px 0;
   padding: 12px 0;
-  border-top: 1px solid rgba(255, 255, 255, 0.1);
-  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  border-top: 1px solid var(--line);
+  border-bottom: 1px solid var(--line);
 }
 
 .voice-engine-grid span {
   display: block;
-  color: var(--cream-100);
+  color: var(--brown-800);
   font-size: 0.76rem;
-  opacity: 0.55;
+  opacity: 0.65;
 }
 
 .voice-engine-grid strong {
   display: block;
   margin-top: 2px;
-  color: var(--cream-50);
+  color: var(--brown-900);
   font-weight: 700;
 }
 
@@ -1429,16 +1431,16 @@ textarea:focus {
   display: flex;
   justify-content: space-between;
   gap: 10px;
-  color: var(--cream-100);
+  color: var(--brown-800);
   font-size: 0.76rem;
-  opacity: 0.55;
+  opacity: 0.65;
 }
 
 .voice-engine-fallback {
-  color: var(--cream-100);
+  color: var(--brown-800);
   font-size: 0.88rem;
   line-height: 1.5;
-  opacity: 0.75;
+  opacity: 0.8;
 }
 
 .price-box strong {
@@ -1631,16 +1633,18 @@ textarea:focus {
   display: grid;
   width: 52px;
   height: 52px;
+  border: 1px solid var(--line);
   border-radius: 50%;
-  background: var(--brown-900);
-  color: var(--cream-50);
+  background: var(--cream-50);
+  color: var(--burgundy-700);
   place-items: center;
   box-shadow: var(--shadow-elegant);
-  transition: transform 0.25s ease, background 0.25s ease;
+  transition: transform 0.25s ease, background 0.25s ease, color 0.25s ease;
 }
 
 .scroll-top-fab:hover {
-  background: var(--brown-950);
+  background: var(--burgundy-700);
+  color: var(--cream-50);
   transform: scale(1.08);
 }
 
