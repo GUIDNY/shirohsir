@@ -1,6 +1,6 @@
 "use client";
 
-import { CSSProperties, FormEvent, useMemo, useState } from "react";
+import { CSSProperties, FormEvent, useCallback, useEffect, useMemo, useState } from "react";
 
 type SongType = "gift" | "business" | "graduation";
 type OrderStatus = "idle" | "sending" | "ready" | "error";
@@ -12,6 +12,8 @@ type OrderPayload = {
   style: string;
   mood: string;
   vocalist: string;
+  languageRegister: string;
+  lyricStructure: string;
   story: string;
   mustInclude: string;
   avoid: string;
@@ -30,6 +32,19 @@ type ApiResult = {
   audioDataUrl?: string;
   audioContentType?: string;
   downloadFileName?: string;
+};
+
+type CreditsInfo = {
+  mode: "demo" | "live";
+  status: string;
+  tier?: string;
+  used?: number;
+  limit?: number;
+  remaining?: number;
+  percentUsed?: number;
+  overageDisabled?: boolean;
+  nextReset?: string | null;
+  updatedAt?: string;
 };
 
 type IconProps = {
@@ -60,6 +75,7 @@ const FileText = (props: IconProps) => <Glyph {...props}>≡</Glyph>;
 const LoaderCircle = (props: IconProps) => <Glyph {...props}>○</Glyph>;
 const LockKeyhole = (props: IconProps) => <Glyph {...props}>●</Glyph>;
 const Music = (props: IconProps) => <Glyph {...props}>♪</Glyph>;
+const Refresh = (props: IconProps) => <Glyph {...props}>↻</Glyph>;
 const ShieldCheck = (props: IconProps) => <Glyph {...props}>◈</Glyph>;
 const SlidersHorizontal = (props: IconProps) => <Glyph {...props}>≋</Glyph>;
 const WandSparkles = (props: IconProps) => <Glyph {...props}>✦</Glyph>;
@@ -90,9 +106,11 @@ const initialOrder: OrderPayload = {
   songType: "gift",
   recipient: "",
   occasion: "",
-  style: "פופ ישראלי קליט",
-  mood: "מרגש ושמח",
-  vocalist: "זמרת",
+  style: "פופ ישראלי עכשווי ונקי",
+  mood: "מרגש אבל לא כבד",
+  vocalist: "זמרת ישראלית חמה",
+  languageRegister: "עברית ישראלית מדוברת",
+  lyricStructure: "בית קצר ופזמון קליט",
   story: "",
   mustInclude: "",
   avoid: "",
@@ -103,22 +121,44 @@ const initialOrder: OrderPayload = {
 };
 
 const styles = [
-  "פופ ישראלי קליט",
-  "בלדה מרגשת",
-  "ים תיכוני עדין",
-  "אקוסטי חם",
-  "היפ הופ קליל",
-  "ג'ינגל פרסומי",
+  "פופ ישראלי עכשווי ונקי",
+  "בלדה ישראלית מרגשת",
+  "ים תיכוני עדין ומכובד",
+  "אקוסטי חם ומשפחתי",
+  "היפ הופ ישראלי קליל",
+  "ג'ינגל קצר לעסק",
 ];
 
-const moods = ["מרגש ושמח", "מצחיק ואישי", "יוקרתי ונקי", "קצבי למסיבה", "נוסטלגי", "ילדותי ומתוק"];
-const vocalists = ["זמרת", "זמר", "דואט", "קבוצה", "קול צעיר", "קול בוגר"];
+const moods = ["מרגש אבל לא כבד", "שמח וקופצני", "מצחיק ואישי", "יוקרתי ונקי", "נוסטלגי וחם", "מתוק לילדים"];
+const vocalists = ["זמרת ישראלית חמה", "זמר ישראלי חם", "דואט גבר ואישה", "קולות קבוצה", "קול צעיר ונקי", "קול בוגר ומכובד"];
+const languageRegisters = ["עברית ישראלית מדוברת", "עברית חגיגית ונקייה", "עברית קלילה עם סלנג עדין", "עברית לילדים"];
+const lyricStructures = ["בית קצר ופזמון קליט", "פזמון פתיחה ישר לעניין", "ג'ינגל עם סלוגן", "ברכה אישית מרגשת"];
+const numberFormatter = new Intl.NumberFormat("he-IL");
+
+function formatNumber(value: number | undefined) {
+  return typeof value === "number" ? numberFormatter.format(value) : "—";
+}
+
+function formatReset(value: string | null | undefined) {
+  if (!value) {
+    return "לא ידוע";
+  }
+
+  return new Intl.DateTimeFormat("he-IL", {
+    day: "2-digit",
+    month: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+  }).format(new Date(value));
+}
 
 export default function Home() {
   const [step, setStep] = useState(0);
   const [order, setOrder] = useState<OrderPayload>(initialOrder);
   const [status, setStatus] = useState<OrderStatus>("idle");
   const [result, setResult] = useState<ApiResult | null>(null);
+  const [credits, setCredits] = useState<CreditsInfo | null>(null);
+  const [creditsStatus, setCreditsStatus] = useState<"loading" | "ready" | "error">("loading");
 
   const selectedType = songTypes.find((item) => item.id === order.songType) ?? songTypes[0];
   const completion = useMemo(() => {
@@ -126,6 +166,10 @@ export default function Home() {
       order.recipient,
       order.occasion,
       order.style,
+      order.mood,
+      order.vocalist,
+      order.languageRegister,
+      order.lyricStructure,
       order.story,
       order.customerName,
       order.email,
@@ -138,6 +182,29 @@ export default function Home() {
   const setField = <K extends keyof OrderPayload>(key: K, value: OrderPayload[K]) => {
     setOrder((current) => ({ ...current, [key]: value }));
   };
+
+  const refreshCredits = useCallback(async () => {
+    try {
+      const response = await fetch("/api/credits", { cache: "no-store" });
+
+      if (!response.ok) {
+        throw new Error("Credits request failed");
+      }
+
+      const data = (await response.json()) as CreditsInfo;
+      setCredits(data);
+      setCreditsStatus("ready");
+    } catch {
+      setCreditsStatus("error");
+    }
+  }, []);
+
+  useEffect(() => {
+    void refreshCredits();
+    const interval = window.setInterval(() => void refreshCredits(), 30000);
+
+    return () => window.clearInterval(interval);
+  }, [refreshCredits]);
 
   const submitOrder = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -159,6 +226,7 @@ export default function Home() {
       setResult(data);
       setStatus("ready");
       setStep(2);
+      void refreshCredits();
     } catch {
       setStatus("error");
     }
@@ -167,12 +235,27 @@ export default function Home() {
   return (
     <main className="site-shell" dir="rtl">
       <nav className="topbar" aria-label="ניווט ראשי">
-        <a className="brand" href="#top" aria-label="מנגינה אישית">
-          <span className="brand-mark">
-            <Music size={22} strokeWidth={2.4} />
-          </span>
-          <span>מנגינה אישית</span>
-        </a>
+        <div className="topbar-main">
+          <a className="brand" href="#top" aria-label="מנגינה אישית">
+            <span className="brand-mark">
+              <Music size={22} strokeWidth={2.4} />
+            </span>
+            <span>מנגינה אישית</span>
+          </a>
+          <div className="credit-pill" aria-live="polite">
+            <span>קרדיטים</span>
+            <strong>
+              {creditsStatus === "loading"
+                ? "בודק..."
+                : creditsStatus === "error"
+                  ? "לא זמין"
+                  : `${formatNumber(credits?.remaining)} נשארו`}
+            </strong>
+            <button type="button" onClick={refreshCredits} aria-label="רענון קרדיטים">
+              <Refresh size={15} />
+            </button>
+          </div>
+        </div>
         <div className="topbar-actions">
           <a href="#legal">מה מותר</a>
           <a href="#api">חיבור API</a>
@@ -258,7 +341,7 @@ export default function Home() {
           <h2>כל מה שצריך כדי להפוך פרטים לשיר.</h2>
           <p>
             הזרימה כאן בנויה כדי למכור שיר אחד בכל פעם: בחירת סוג, איסוף פרטים,
-            אישור שימוש ותשלום. כרגע התשלום וההפקה במצב הדגמה.
+            אישור שימוש ותשלום. ההפקה מחוברת ל־ElevenLabs כשיש מפתח פעיל; התשלום עדיין במצב הדגמה.
           </p>
         </div>
 
@@ -361,6 +444,28 @@ export default function Home() {
                   </select>
                 </label>
                 <label>
+                  סוג העברית
+                  <select
+                    value={order.languageRegister}
+                    onChange={(event) => setField("languageRegister", event.target.value)}
+                  >
+                    {languageRegisters.map((register) => (
+                      <option key={register}>{register}</option>
+                    ))}
+                  </select>
+                </label>
+                <label>
+                  מבנה מילים
+                  <select
+                    value={order.lyricStructure}
+                    onChange={(event) => setField("lyricStructure", event.target.value)}
+                  >
+                    {lyricStructures.map((structure) => (
+                      <option key={structure}>{structure}</option>
+                    ))}
+                  </select>
+                </label>
+                <label>
                   שם הלקוח
                   <input
                     required
@@ -453,6 +558,10 @@ export default function Home() {
                   <strong>{order.style}</strong>
                 </div>
                 <div>
+                  <span>עברית</span>
+                  <strong>{order.languageRegister}</strong>
+                </div>
+                <div>
                   <span>מחיר</span>
                   <strong>30 ש״ח</strong>
                 </div>
@@ -506,6 +615,51 @@ export default function Home() {
         </form>
 
         <aside className="order-sidebar" aria-label="תקציר הזמנה">
+          <div className="credits-box">
+            <div className="credits-heading">
+              <span>מלאי ElevenLabs</span>
+              <button type="button" onClick={refreshCredits} aria-label="רענון מצב קרדיטים">
+                <Refresh size={15} />
+              </button>
+            </div>
+            <strong>
+              {creditsStatus === "loading"
+                ? "בודק קרדיטים..."
+                : creditsStatus === "error"
+                  ? "לא ניתן לקרוא כרגע"
+                  : `${formatNumber(credits?.remaining)} נשארו`}
+            </strong>
+            {creditsStatus === "ready" && (
+              <>
+                <div className="credits-track" aria-hidden="true">
+                  <span style={{ width: `${credits?.percentUsed ?? 0}%` }} />
+                </div>
+                <dl>
+                  <div>
+                    <dt>נוצל</dt>
+                    <dd>{formatNumber(credits?.used)}</dd>
+                  </div>
+                  <div>
+                    <dt>מגבלה</dt>
+                    <dd>{formatNumber(credits?.limit)}</dd>
+                  </div>
+                  <div>
+                    <dt>תוכנית</dt>
+                    <dd>{credits?.tier || "לא ידוע"}</dd>
+                  </div>
+                  <div>
+                    <dt>איפוס</dt>
+                    <dd>{formatReset(credits?.nextReset)}</dd>
+                  </div>
+                </dl>
+                <p>
+                  {credits?.overageDisabled
+                    ? "חריגה בתשלום כבויה כרגע."
+                    : "שים לב: ייתכן שמותרת חריגה בתשלום."}
+                </p>
+              </>
+            )}
+          </div>
           <div className="progress-box">
             <span>שלמות פרטים</span>
             <strong>{completion}%</strong>
@@ -539,8 +693,8 @@ export default function Home() {
           <p className="eyebrow">תשתית API</p>
           <h2>מוכן לספק מוזיקה, אבל לא תלוי ב־Suno לא רשמי.</h2>
           <p>
-            ה־endpoint המקומי מקבל את ההזמנה, בונה פרומפט מסודר ומחזיר Job ID.
-            כשקיים מפתח ElevenLabs בסביבה, הוא מחזיר גם קובץ MP3 לניגון והורדה.
+            ה־endpoint המקומי מקבל את ההזמנה, בונה פרומפט עברי מדויק ומחזיר קובץ MP3 לניגון והורדה.
+            במקביל האתר קורא את מצב הקרדיטים מ־ElevenLabs ומעדכן אותו אוטומטית.
           </p>
         </div>
         <div className="api-grid">

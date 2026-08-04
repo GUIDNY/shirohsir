@@ -7,6 +7,8 @@ type OrderPayload = {
   style?: string;
   mood?: string;
   vocalist?: string;
+  languageRegister?: string;
+  lyricStructure?: string;
   story?: string;
   mustInclude?: string;
   avoid?: string;
@@ -42,6 +44,8 @@ const requiredFields: Array<keyof OrderPayload> = [
   "style",
   "mood",
   "vocalist",
+  "languageRegister",
+  "lyricStructure",
   "story",
   "customerName",
   "email",
@@ -52,21 +56,96 @@ function text(value: unknown) {
   return typeof value === "string" ? value.trim().slice(0, 1200) : "";
 }
 
+const songTypeDirections: Record<string, string> = {
+  gift:
+    "Personal gift song. Warm, specific, emotional without being sentimental or embarrassing. Address the subject naturally in second person when it fits.",
+  business:
+    "Short brand song or jingle. Clear hook, polished commercial Hebrew, memorable phrase, no hard-sell cliches, suitable for a social video.",
+  graduation:
+    "End-of-year or graduation song. Inclusive plural Hebrew, celebratory and nostalgic, easy for a group to sing along to.",
+};
+
+const styleDirections: Record<string, string> = {
+  "פופ ישראלי עכשווי ונקי":
+    "Contemporary Israeli pop, warm piano/guitar, light electronic drums, polished radio feel, 92-108 BPM.",
+  "בלדה ישראלית מרגשת":
+    "Emotional Israeli ballad, piano and acoustic guitar, gradual lift, intimate vocal, 72-86 BPM.",
+  "ים תיכוני עדין ומכובד":
+    "Gentle Mediterranean Israeli style, darbuka touches, oud or nylon guitar, tasteful and not caricatured, 96-112 BPM.",
+  "אקוסטי חם ומשפחתי":
+    "Warm acoustic arrangement, nylon guitar, soft percussion, close vocal, natural family-event feeling, 82-98 BPM.",
+  "היפ הופ ישראלי קליל":
+    "Light Israeli hip hop/pop rap, conversational Hebrew flow, clean beat, catchy sung hook, 88-100 BPM.",
+  "ג'ינגל קצר לעסק":
+    "Compact advertising jingle, immediate melodic hook, clear brand name, bright instruments, 110-128 BPM.",
+};
+
+const moodDirections: Record<string, string> = {
+  "מרגש אבל לא כבד": "moving and sincere, but not sad or heavy",
+  "שמח וקופצני": "happy, energetic, danceable, with a smile in the vocal delivery",
+  "מצחיק ואישי": "playful, personal, witty, but never mocking or childish",
+  "יוקרתי ונקי": "premium, restrained, elegant, clear diction, no noisy production",
+  "נוסטלגי וחם": "nostalgic, warm, memory-driven, with a sense of shared history",
+  "מתוק לילדים": "sweet, simple, child-friendly, clear words, no baby talk",
+};
+
+const vocalistDirections: Record<string, string> = {
+  "זמרת ישראלית חמה": "female Israeli vocalist, warm clear diction, natural Hebrew phrasing",
+  "זמר ישראלי חם": "male Israeli vocalist, warm clear diction, natural Hebrew phrasing",
+  "דואט גבר ואישה": "male and female duet, gentle harmonies, clear call-and-response moments",
+  "קולות קבוצה": "small group vocals in the chorus, singalong feeling, clear lead vocal in verses",
+  "קול צעיר ונקי": "young clean vocal, bright and friendly, suitable for school or birthday",
+  "קול בוגר ומכובד": "mature respectful vocal, calm and confident, suitable for family or business",
+};
+
+const languageDirections: Record<string, string> = {
+  "עברית ישראלית מדוברת":
+    "Use natural modern Israeli Hebrew, like people actually speak in Israel. Avoid translationese and overly formal wording.",
+  "עברית חגיגית ונקייה":
+    "Use polished festive Hebrew that still sounds singable and contemporary. Avoid biblical stiffness.",
+  "עברית קלילה עם סלנג עדין":
+    "Use light everyday Hebrew with only gentle slang where it feels natural. Do not overdo slang.",
+  "עברית לילדים":
+    "Use simple, clear Hebrew that children can sing. Short sentences, concrete images, no babyish wording.",
+};
+
+const lyricStructureDirections: Record<string, string> = {
+  "בית קצר ופזמון קליט":
+    "20-second structure: two short verse lines, then a four-line chorus with one repeated hook.",
+  "פזמון פתיחה ישר לעניין":
+    "20-second structure: start immediately with the hook, then add two personal detail lines, then repeat the hook.",
+  "ג'ינגל עם סלוגן":
+    "20-second structure: brand/subject name in the first line, benefit or emotion in the second, slogan twice as the hook.",
+  "ברכה אישית מרגשת":
+    "20-second structure: one intimate opening line, two concrete memories/details, one heartfelt wish as the hook.",
+};
+
+function directionFor(map: Record<string, string>, value: unknown) {
+  const key = text(value);
+
+  return map[key] || key || "not specified";
+}
+
 function buildMusicPrompt(order: OrderPayload) {
+  const structure = directionFor(lyricStructureDirections, order.lyricStructure);
   const lines = [
-    "Create an original Hebrew song in Hebrew for a paying customer.",
-    "Use natural Hebrew lyrics with correct right-to-left wording. Do not transliterate Hebrew into English.",
-    "Make the song complete, catchy, emotionally clear, and suitable for delivery to a customer.",
-    `Song type: ${text(order.songType)}`,
+    "Create a 20-second original song with Hebrew lyrics for a paying customer.",
+    "The Hebrew is the highest priority: write idiomatic modern Israeli Hebrew, not translated English. Use correct right-to-left Hebrew words only, no transliteration, no niqqud, no English lyric fragments unless the customer explicitly provided them.",
+    "Make the lyrics singable: short lines, clear stresses, natural word order, no forced rhymes, no awkward gender shifts, no inflated phrases like generic AI poetry.",
+    "Use concrete personal details from the customer story. Prefer simple emotional images over abstract compliments.",
+    "Because the output is 20 seconds, keep the song compact and complete. Do not create a long intro.",
+    `Song type direction: ${directionFor(songTypeDirections, order.songType)}`,
     `Subject: ${text(order.recipient)}`,
     `Occasion or campaign goal: ${text(order.occasion)}`,
-    `Music style: ${text(order.style)}`,
-    `Mood: ${text(order.mood)}`,
-    `Vocal direction: ${text(order.vocalist)}`,
+    `Music style direction: ${directionFor(styleDirections, order.style)}`,
+    `Mood direction: ${directionFor(moodDirections, order.mood)}`,
+    `Vocal direction: ${directionFor(vocalistDirections, order.vocalist)}`,
+    `Hebrew register: ${directionFor(languageDirections, order.languageRegister)}`,
+    `Lyric structure: ${structure}`,
     `Customer story: ${text(order.story)}`,
     `Must include: ${text(order.mustInclude) || "none"}`,
     `Avoid: ${text(order.avoid) || "none"}`,
-    "Important: write original lyrics only. Do not imitate a named artist, existing song, protected voice, melody, or copyrighted lyrics.",
+    "Final safety rule: write original lyrics and melody only. Do not imitate a named artist, existing song, protected voice, melody, or copyrighted lyrics.",
   ];
 
   return lines.join("\n");

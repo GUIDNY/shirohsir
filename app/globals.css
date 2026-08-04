@@ -76,8 +76,10 @@ a {
 }
 
 .brand,
+.topbar-main,
 .topbar-actions,
 .nav-cta,
+.credit-pill,
 .primary-link,
 .secondary-link,
 .primary-button,
@@ -104,6 +106,10 @@ a {
   font-weight: 800;
 }
 
+.topbar-main {
+  gap: 14px;
+}
+
 .brand-mark {
   display: grid;
   width: 42px;
@@ -119,6 +125,36 @@ a {
   gap: 18px;
   color: var(--ink-muted);
   font-weight: 700;
+}
+
+.credit-pill {
+  gap: 8px;
+  min-height: 40px;
+  padding: 0 10px;
+  border: 1px solid rgba(15, 143, 120, 0.22);
+  border-radius: 8px;
+  background: rgba(255, 253, 248, 0.9);
+  color: var(--mint-dark);
+  font-size: 0.9rem;
+  font-weight: 900;
+  white-space: nowrap;
+}
+
+.credit-pill span {
+  color: var(--ink-muted);
+}
+
+.credit-pill button,
+.credits-heading button {
+  display: grid;
+  width: 28px;
+  height: 28px;
+  place-items: center;
+  border: 0;
+  border-radius: 8px;
+  background: var(--teal-soft);
+  color: var(--mint-dark);
+  cursor: pointer;
 }
 
 .nav-cta {
@@ -594,7 +630,8 @@ textarea:focus {
 
 .summary-grid span,
 .price-box span,
-.progress-box span {
+.progress-box span,
+.credits-box span {
   display: block;
   color: var(--ink-muted);
   font-size: 0.92rem;
@@ -603,7 +640,8 @@ textarea:focus {
 
 .summary-grid strong,
 .price-box strong,
-.progress-box strong {
+.progress-box strong,
+.credits-box strong {
   display: block;
   margin-top: 4px;
   font-size: 1.2rem;
@@ -705,10 +743,74 @@ textarea:focus {
 
 .progress-box,
 .price-box,
+.credits-box,
 .checklist-box {
   padding: 16px;
   border-radius: 8px;
   background: #fff;
+}
+
+.credits-box {
+  border: 1px solid rgba(15, 143, 120, 0.18);
+}
+
+.credits-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.credits-box strong {
+  color: var(--mint-dark);
+  font-size: 1.65rem;
+  line-height: 1.15;
+}
+
+.credits-track {
+  height: 10px;
+  margin: 12px 0;
+  overflow: hidden;
+  border-radius: 99px;
+  background: var(--teal-soft);
+}
+
+.credits-track span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, var(--sun), var(--rose));
+}
+
+.credits-box dl {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  margin: 0;
+}
+
+.credits-box dl div {
+  min-width: 0;
+}
+
+.credits-box dt {
+  color: var(--ink-muted);
+  font-size: 0.8rem;
+  font-weight: 800;
+}
+
+.credits-box dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+  font-weight: 900;
+}
+
+.credits-box p {
+  margin: 12px 0 0;
+  color: var(--mint-dark);
+  font-size: 0.9rem;
+  font-weight: 800;
+  line-height: 1.45;
 }
 
 .progress-track {
@@ -808,6 +910,10 @@ textarea:focus {
     align-items: flex-start;
   }
 
+  .topbar-main {
+    flex-wrap: wrap;
+  }
+
   .topbar-actions {
     flex-wrap: wrap;
     justify-content: flex-end;
@@ -842,7 +948,27 @@ textarea:focus {
 
 @media (max-width: 640px) {
   .topbar {
+    flex-direction: column;
     width: min(100% - 24px, 1180px);
+  }
+
+  .topbar-main,
+  .credit-pill {
+    width: 100%;
+  }
+
+  .credit-pill {
+    justify-content: space-between;
+  }
+
+  .topbar-actions {
+    width: 100%;
+    justify-content: stretch;
+  }
+
+  .nav-cta {
+    width: 100%;
+    justify-content: center;
   }
 
   .topbar-actions a:not(.nav-cta) {
