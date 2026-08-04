@@ -136,6 +136,15 @@ const languageRegisters = ["עברית ישראלית מדוברת", "עברית
 const lyricStructures = ["בית קצר ופזמון קליט", "פזמון פתיחה ישר לעניין", "ג'ינגל עם סלוגן", "ברכה אישית מרגשת"];
 const numberFormatter = new Intl.NumberFormat("he-IL");
 
+const requiredOrderFields: Array<{ key: keyof OrderPayload; label: string }> = [
+  { key: "recipient", label: "שם/מותג שעליו השיר" },
+  { key: "occasion", label: "אירוע או מטרה" },
+  { key: "story", label: "הסיפור" },
+  { key: "customerName", label: "שם הלקוח" },
+  { key: "email", label: "אימייל" },
+  { key: "phone", label: "טלפון" },
+];
+
 const allowedRules = [
   {
     icon: CheckCircle,
@@ -288,9 +297,19 @@ export default function Home() {
 
   const submitOrder = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    setStatus("sending");
     setResult(null);
     setOrderError(null);
+
+    const missingField = requiredOrderFields.find(({ key }) => !order[key]?.toString().trim());
+
+    if (missingField) {
+      setStep(1);
+      setOrderError(`חסר שדה חובה: "${missingField.label}". אפשר להשלים אותו בשלב "פרטים".`);
+      setStatus("error");
+      return;
+    }
+
+    setStatus("sending");
 
     try {
       const headers: Record<string, string> = { "Content-Type": "application/json" };
@@ -307,6 +326,13 @@ export default function Home() {
 
       if (response.status === 402) {
         setOrderError("נגמרו לך הקרדיטים. אפשר להירשם לחבילה נוספת או לרכוש קרדיטים.");
+        setStatus("error");
+        return;
+      }
+
+      if (response.status === 400) {
+        setStep(1);
+        setOrderError("חסרים פרטים בטופס — אפשר לעבור על שלב \"פרטים\" ולוודא שכל השדות מלאים.");
         setStatus("error");
         return;
       }
@@ -497,6 +523,10 @@ export default function Home() {
               </button>
             ))}
           </div>
+
+          {status === "error" && orderError && (
+            <p className="status-message error form-level-error">{orderError}</p>
+          )}
 
           {step === 0 && (
             <div className="form-panel">
@@ -739,8 +769,6 @@ export default function Home() {
                 {status === "sending" ? <Loader size={18} /> : <Lock size={18} />}
                 {status === "sending" ? "שולח להזמנה" : "הדמיית הזמנה ב־30 ש\"ח"}
               </button>
-
-              {status === "error" && orderError && <p className="status-message error">{orderError}</p>}
 
               {result && (
                 <div className="api-result">
