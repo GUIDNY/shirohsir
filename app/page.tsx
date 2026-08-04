@@ -732,6 +732,12 @@ export default function Home() {
                     <span>
                       מצב: {result.mode === "live" ? "מחובר לספק" : "דמו"} · ספק: {result.provider}
                     </span>
+                    {result.promptPreview && (
+                      <div className="lyrics-preview">
+                        <span className="lyrics-preview-label">מילות השיר</span>
+                        <p>{result.promptPreview}</p>
+                      </div>
+                    )}
                     {result.audioDataUrl && (
                       <div className="audio-delivery">
                         <audio controls src={result.audioDataUrl}>

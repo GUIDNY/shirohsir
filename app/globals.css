@@ -1040,6 +1040,31 @@ textarea:focus {
   color: var(--brown-800);
 }
 
+.lyrics-preview {
+  margin-top: 14px;
+  padding: 14px 16px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: var(--cream-50);
+}
+
+.lyrics-preview-label {
+  display: block;
+  margin-bottom: 6px;
+  color: var(--brown-800);
+  font-size: 0.78rem;
+  font-weight: 600;
+  opacity: 0.6;
+}
+
+.lyrics-preview p {
+  margin: 0;
+  color: var(--brown-900);
+  font-size: 0.92rem;
+  line-height: 1.7;
+  white-space: pre-line;
+}
+
 .audio-delivery {
   display: grid;
   gap: 10px;
