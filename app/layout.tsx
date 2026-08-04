@@ -1,0 +1,56 @@
+import type { Metadata } from "next";
+import { Heebo } from "next/font/google";
+import "./globals.css";
+
+const heebo = Heebo({
+  variable: "--font-heebo",
+  subsets: ["hebrew", "latin"],
+  display: "swap",
+});
+
+const siteTitle = "מנגינה אישית | יצירת שיר AI בעברית";
+const siteDescription =
+  "אתר הזמנות לשירים אישיים בעברית עם תמחור 30 ש״ח ותשתית מוכנה לחיבור ספק מוזיקה מורשה.";
+const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000";
+
+export const metadata: Metadata = {
+  metadataBase: new URL(siteUrl),
+  title: siteTitle,
+  description: siteDescription,
+  icons: {
+    icon: "/favicon.svg",
+    shortcut: "/favicon.svg",
+  },
+  openGraph: {
+    title: siteTitle,
+    description: siteDescription,
+    locale: "he_IL",
+    type: "website",
+    images: [
+      {
+        url: "/og.png",
+        width: 1200,
+        height: 630,
+        alt: "מנגינה אישית - אתר יצירת שיר AI בעברית",
+      },
+    ],
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: siteTitle,
+    description: siteDescription,
+    images: ["/og.png"],
+  },
+};
+
+export default function RootLayout({
+  children,
+}: Readonly<{
+  children: React.ReactNode;
+}>) {
+  return (
+    <html dir="rtl" lang="he">
+      <body className={`${heebo.variable} antialiased`}>{children}</body>
+    </html>
+  );
+}
