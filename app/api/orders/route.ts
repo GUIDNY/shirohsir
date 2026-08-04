@@ -129,7 +129,7 @@ async function createElevenLabsSong(prompt: string, order: OrderPayload): Promis
   const apiUrl =
     process.env.ELEVENLABS_MUSIC_API_URL ||
     `https://api.elevenlabs.io/v1/music/stream?output_format=${encodeURIComponent(outputFormat)}`;
-  const musicLengthMs = envNumber("ELEVENLABS_MUSIC_LENGTH_MS", 60000, 3000, 600000);
+  const musicLengthMs = envNumber("ELEVENLABS_MUSIC_LENGTH_MS", 20000, 3000, 600000);
   const modelId = process.env.ELEVENLABS_MUSIC_MODEL_ID || "music_v1";
 
   if (!apiKey) {
