@@ -604,7 +604,7 @@ export default function Home() {
                   <input
                     value={order.pronunciation}
                     onChange={(event) => setField("pronunciation", event.target.value)}
-                    placeholder="כתיב עברי לשם הראשי. למשל: SkiShare = סקי שייר"
+                    placeholder="למשל: סקי שייר (לשם באנגלית)"
                   />
                 </label>
                 <label className="wide">
