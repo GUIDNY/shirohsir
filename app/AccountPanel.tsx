@@ -50,7 +50,7 @@ export function AccountPanel({ account }: { account: ReturnType<typeof useAccoun
         <div className="account-pill">
           <span className="account-email">{user.email}</span>
           <span className="account-credits-inline">
-            {creditsLoading ? "…" : `${credits?.balance ?? 0} קרדיטים`}
+            {creditsLoading ? "…" : credits?.isAdmin ? "∞ מנהל" : `${credits?.balance ?? 0} קרדיטים`}
           </span>
         </div>
         <button className="account-signout" type="button" onClick={() => void signOut()}>

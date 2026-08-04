@@ -1,8 +1,23 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getUserFromRequest } from "@/lib/auth-user";
+import { isAdminUser } from "@/lib/is-admin";
 import { createServerClient } from "@/lib/supabase-server";
 
-const ORDER_CREDITS_COST = 1;
+const SECONDS_PER_CREDIT = 10;
+const MIN_SONG_SECONDS = 10;
+const MAX_SONG_SECONDS = 60;
+const DEFAULT_SONG_SECONDS = 20;
+
+function clampSongSeconds(value: number | undefined) {
+  const raw = typeof value === "number" && Number.isFinite(value) ? value : DEFAULT_SONG_SECONDS;
+  const rounded = Math.round(raw / SECONDS_PER_CREDIT) * SECONDS_PER_CREDIT;
+
+  return Math.min(Math.max(rounded, MIN_SONG_SECONDS), MAX_SONG_SECONDS);
+}
+
+function creditsForSongSeconds(seconds: number) {
+  return Math.max(1, Math.ceil(seconds / SECONDS_PER_CREDIT));
+}
 
 type OrderPayload = {
   songType?: string;
@@ -21,6 +36,7 @@ type OrderPayload = {
   email?: string;
   phone?: string;
   consent?: boolean;
+  songLengthSeconds?: number;
 };
 
 type OrderResponse = {
@@ -323,17 +339,6 @@ async function addNiqqud(lyrics: string): Promise<string> {
   return vocalized.join("\n");
 }
 
-function envNumber(name: string, fallback: number, min: number, max: number) {
-  const raw = process.env[name];
-  const parsed = raw ? Number(raw) : NaN;
-
-  if (!Number.isFinite(parsed)) {
-    return fallback;
-  }
-
-  return Math.min(Math.max(Math.round(parsed), min), max);
-}
-
 function contentTypeForOutputFormat(outputFormat: string) {
   if (outputFormat.startsWith("wav")) {
     return "audio/wav";
@@ -380,7 +385,7 @@ function safeFileName(value: string) {
   );
 }
 
-async function createElevenLabsSong(order: OrderPayload): Promise<OrderResponse> {
+async function createElevenLabsSong(order: OrderPayload, songSeconds: number): Promise<OrderResponse> {
   const apiKey = cleanApiKey(
     process.env.ELEVENLABS_API_KEY ||
       process.env.ELEVEN_API_KEY ||
@@ -392,7 +397,7 @@ async function createElevenLabsSong(order: OrderPayload): Promise<OrderResponse>
   const apiUrl =
     process.env.ELEVENLABS_MUSIC_API_URL ||
     `https://api.elevenlabs.io/v1/music/stream?output_format=${encodeURIComponent(outputFormat)}`;
-  const musicLengthMs = envNumber("ELEVENLABS_MUSIC_LENGTH_MS", 20000, 3000, 600000);
+  const musicLengthMs = songSeconds * 1000;
   const modelId = process.env.ELEVENLABS_MUSIC_MODEL_ID || "music_v2";
   const lyrics = buildHebrewLyrics(order);
   const positiveStyles = [
@@ -483,6 +488,8 @@ async function persistOrder(
   userId: string,
   order: OrderPayload,
   response: OrderResponse,
+  songSeconds: number,
+  creditsCost: number,
 ) {
   const { error } = await supabase.from("orders").insert({
     user_id: userId,
@@ -505,7 +512,8 @@ async function persistOrder(
     provider: response.provider,
     provider_order_id: response.orderId,
     prompt_preview: response.promptPreview,
-    credits_cost: ORDER_CREDITS_COST,
+    song_length_seconds: songSeconds,
+    credits_cost: creditsCost,
   });
 
   if (error) {
@@ -524,14 +532,17 @@ export async function POST(request: NextRequest) {
     );
   }
 
+  const songSeconds = clampSongSeconds(order.songLengthSeconds);
+  const creditsCost = creditsForSongSeconds(songSeconds);
   const user = await getUserFromRequest(request);
+  const admin = isAdminUser(user);
   const supabase = user ? createServerClient() : null;
 
   try {
-    if (user && supabase) {
+    if (user && supabase && !admin) {
       const { error: spendError } = await supabase.rpc("spend_credits", {
         p_user_id: user.id,
-        p_amount: ORDER_CREDITS_COST,
+        p_amount: creditsCost,
         p_reason: "order_spend",
       });
 
@@ -550,13 +561,13 @@ export async function POST(request: NextRequest) {
     let response: OrderResponse;
 
     try {
-      response = await createElevenLabsSong(order);
+      response = await createElevenLabsSong(order, songSeconds);
     } catch (generationError) {
-      if (user && supabase) {
+      if (user && supabase && !admin) {
         // Generation failed after the credit was already spent — refund it.
         await supabase.rpc("spend_credits", {
           p_user_id: user.id,
-          p_amount: -ORDER_CREDITS_COST,
+          p_amount: -creditsCost,
           p_reason: "refund",
           p_note: "generation failed",
         });
@@ -566,7 +577,7 @@ export async function POST(request: NextRequest) {
     }
 
     if (user && supabase) {
-      await persistOrder(supabase, user.id, order, response);
+      await persistOrder(supabase, user.id, order, response, songSeconds, admin ? 0 : creditsCost);
     }
 
     return NextResponse.json(response);

@@ -1,4 +1,6 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
+import { getUserFromRequest } from "@/lib/auth-user";
+import { isAdminUser } from "@/lib/is-admin";
 
 export const dynamic = "force-dynamic";
 
@@ -34,7 +36,13 @@ function safeNumber(value: unknown) {
   return typeof value === "number" && Number.isFinite(value) ? value : 0;
 }
 
-export async function GET() {
+export async function GET(request: NextRequest) {
+  const user = await getUserFromRequest(request);
+
+  if (!isAdminUser(user)) {
+    return NextResponse.json({ error: "מנהל בלבד" }, { status: 403 });
+  }
+
   const apiKey = cleanApiKey(
     process.env.ELEVENLABS_API_KEY ||
       process.env.ELEVEN_API_KEY ||

@@ -6,6 +6,8 @@ import { supabase } from "@/lib/supabase-client";
 
 type AccountCredits = {
   balance: number;
+  isAdmin: boolean;
+  unlimited: boolean;
   subscription: { plan: string; status: string } | null;
 };
 
@@ -36,7 +38,12 @@ export function useAccount() {
       }
 
       const data = await response.json();
-      setCredits({ balance: data.balance, subscription: data.subscription });
+      setCredits({
+        balance: data.balance,
+        isAdmin: data.isAdmin === true,
+        unlimited: data.unlimited === true,
+        subscription: data.subscription,
+      });
     } catch {
       setCredits(null);
     } finally {

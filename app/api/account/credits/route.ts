@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getUserFromRequest } from "@/lib/auth-user";
+import { isAdminUser } from "@/lib/is-admin";
 import { createServerClient } from "@/lib/supabase-server";
 
 export const dynamic = "force-dynamic";
@@ -11,6 +12,7 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: "לא מחובר/ת" }, { status: 401 });
   }
 
+  const admin = isAdminUser(user);
   const supabase = createServerClient();
   const { data: balanceRow } = await supabase
     .from("credit_balances")
@@ -28,6 +30,8 @@ export async function GET(request: NextRequest) {
   return NextResponse.json(
     {
       email: user.email,
+      isAdmin: admin,
+      unlimited: admin,
       balance: balanceRow?.balance ?? 0,
       updatedAt: balanceRow?.updated_at ?? null,
       subscription: subscriptionRow ?? null,

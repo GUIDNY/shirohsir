@@ -50,6 +50,7 @@ type OrderPayload = {
   email: string;
   phone: string;
   consent: boolean;
+  songLengthSeconds: number;
 };
 
 type ApiResult = {
@@ -119,7 +120,11 @@ const initialOrder: OrderPayload = {
   email: "",
   phone: "",
   consent: false,
+  songLengthSeconds: 20,
 };
+
+const SECONDS_PER_CREDIT = 10;
+const songLengthOptions = [10, 20, 30, 45, 60];
 
 const styles = [
   "פופ ישראלי עכשווי ונקי",
@@ -248,6 +253,7 @@ export default function Home() {
   const [credits, setCredits] = useState<CreditsInfo | null>(null);
   const [creditsStatus, setCreditsStatus] = useState<"loading" | "ready" | "error">("loading");
   const isLiveCredits = creditsStatus === "ready" && credits?.mode === "live";
+  const isAdmin = account.credits?.isAdmin === true;
 
   const selectedType = songTypes.find((item) => item.id === order.songType) ?? songTypes[0];
   const completion = useMemo(() => {
@@ -272,9 +278,18 @@ export default function Home() {
     setOrder((current) => ({ ...current, [key]: value }));
   };
 
+  const accessToken = account.session?.access_token;
+
   const refreshCredits = useCallback(async () => {
+    if (!isAdmin || !accessToken) {
+      return;
+    }
+
     try {
-      const response = await fetch("/api/credits", { cache: "no-store" });
+      const response = await fetch("/api/credits", {
+        cache: "no-store",
+        headers: { Authorization: `Bearer ${accessToken}` },
+      });
 
       if (!response.ok) {
         throw new Error("Credits request failed");
@@ -286,14 +301,18 @@ export default function Home() {
     } catch {
       setCreditsStatus("error");
     }
-  }, []);
+  }, [isAdmin, accessToken]);
 
   useEffect(() => {
+    if (!isAdmin) {
+      return;
+    }
+
     void refreshCredits();
     const interval = window.setInterval(() => void refreshCredits(), 30000);
 
     return () => window.clearInterval(interval);
-  }, [refreshCredits]);
+  }, [isAdmin, refreshCredits]);
 
   const submitOrder = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -370,20 +389,22 @@ export default function Home() {
 
         <div className="topbar-end">
           <AccountPanel account={account} />
-          <div className="credit-pill" aria-live="polite" title="מלאי הפקה מול ElevenLabs">
-            <span>מלאי:</span>
-            <strong>
-              {creditsStatus === "loading"
-                ? "בודק..."
-                : creditsStatus === "error"
-                  ? "לא זמין"
-                  : formatNumber(credits?.remaining)}
-            </strong>
-            <Coin size={16} className="coin-icon" />
-            <button type="button" onClick={refreshCredits} aria-label="רענון מלאי">
-              <Refresh size={13} />
-            </button>
-          </div>
+          {isAdmin && (
+            <div className="credit-pill" aria-live="polite" title="מלאי הפקה מול ElevenLabs (מנהל בלבד)">
+              <span>מלאי:</span>
+              <strong>
+                {creditsStatus === "loading"
+                  ? "בודק..."
+                  : creditsStatus === "error"
+                    ? "לא זמין"
+                    : formatNumber(credits?.remaining)}
+              </strong>
+              <Coin size={16} className="coin-icon" />
+              <button type="button" onClick={refreshCredits} aria-label="רענון מלאי">
+                <Refresh size={13} />
+              </button>
+            </div>
+          )}
           <a className="nav-cta" href="#order">
             הזמנה ב־30 ש״ח
             <ArrowLeft size={16} />
@@ -556,6 +577,34 @@ export default function Home() {
                   </label>
                 ))}
               </div>
+
+              <div className="length-picker">
+                <span className="length-picker-label">אורך השיר</span>
+                <div className="length-grid">
+                  {songLengthOptions.map((seconds) => {
+                    const creditsCost = Math.max(1, Math.ceil(seconds / SECONDS_PER_CREDIT));
+
+                    return (
+                      <label
+                        className={order.songLengthSeconds === seconds ? "length-card selected" : "length-card"}
+                        key={seconds}
+                      >
+                        <input
+                          checked={order.songLengthSeconds === seconds}
+                          name="songLengthSeconds"
+                          onChange={() => setField("songLengthSeconds", seconds)}
+                          type="radio"
+                        />
+                        <strong>{seconds} שנ&apos;</strong>
+                        <span>
+                          {creditsCost} {creditsCost === 1 ? "קרדיט" : "קרדיטים"}
+                        </span>
+                      </label>
+                    );
+                  })}
+                </div>
+              </div>
+
               <button className="primary-button" type="button" onClick={() => setStep(1)}>
                 ממשיכים לפרטים
                 <ArrowLeft size={18} />
@@ -747,6 +796,15 @@ export default function Home() {
                   <strong>{order.languageRegister}</strong>
                 </div>
                 <div>
+                  <span>אורך</span>
+                  <strong>
+                    {order.songLengthSeconds} שנ&apos; ·{" "}
+                    {isAdmin
+                      ? "ללא עלות (מנהל)"
+                      : `${Math.max(1, Math.ceil(order.songLengthSeconds / SECONDS_PER_CREDIT))} קרדיטים`}
+                  </strong>
+                </div>
+                <div>
                   <span>מחיר</span>
                   <strong>30 ש״ח</strong>
                 </div>
@@ -812,49 +870,64 @@ export default function Home() {
             </div>
           </div>
 
-          <div className="voice-engine-card">
-            <div className="voice-engine-heading">
-              <span className="voice-engine-name">
-                מנוע קולי
-                <strong>ElevenLabs</strong>
-              </span>
-              <span className={isLiveCredits ? "connected-pill" : "connected-pill offline"}>
-                <span className="connected-dot" />
-                {isLiveCredits ? "מחובר" : creditsStatus === "loading" ? "בודק" : "מצב הדגמה"}
-              </span>
-            </div>
+          {isAdmin ? (
+            <div className="voice-engine-card">
+              <div className="voice-engine-heading">
+                <span className="voice-engine-name">
+                  מנוע קולי · מנהל
+                  <strong>ElevenLabs</strong>
+                </span>
+                <span className={isLiveCredits ? "connected-pill" : "connected-pill offline"}>
+                  <span className="connected-dot" />
+                  {isLiveCredits ? "מחובר" : creditsStatus === "loading" ? "בודק" : "מצב הדגמה"}
+                </span>
+              </div>
 
-            {isLiveCredits ? (
-              <>
-                <span className="voice-engine-label">תווים נותרים לחודש</span>
+              {isLiveCredits ? (
+                <>
+                  <span className="voice-engine-label">תווים נותרים לחודש</span>
+                  <div className="voice-engine-stat">
+                    <span>{formatCompact(credits?.limit)} /</span>
+                    <strong>{formatCompact(credits?.remaining)}</strong>
+                  </div>
+                  <div className="voice-engine-track">
+                    <span style={{ width: `${credits?.percentUsed ?? 0}%` }} />
+                  </div>
+                  <div className="voice-engine-grid">
+                    <div>
+                      <span>תוכנית</span>
+                      <strong>{credits?.tier || "לא ידוע"}</strong>
+                    </div>
+                    <div>
+                      <span>נוצל</span>
+                      <strong>{formatNumber(credits?.used)}</strong>
+                    </div>
+                  </div>
+                  <div className="voice-engine-footer">
+                    <span>{credits?.overageDisabled ? "חריגה כבויה" : "חריגה אפשרית"}</span>
+                    <span>איפוס ב: {formatReset(credits?.nextReset)}</span>
+                  </div>
+                </>
+              ) : (
+                <p className="voice-engine-fallback">
+                  {creditsStatus === "loading" ? "בודק חיבור ל-ElevenLabs..." : "אין מפתח ElevenLabs פעיל — מצב הדגמה."}
+                </p>
+              )}
+            </div>
+          ) : (
+            account.user && (
+              <div className="voice-engine-card">
+                <div className="voice-engine-heading">
+                  <span className="voice-engine-name">היתרה שלך</span>
+                </div>
                 <div className="voice-engine-stat">
-                  <span>{formatCompact(credits?.limit)} /</span>
-                  <strong>{formatCompact(credits?.remaining)}</strong>
+                  <strong>{account.credits?.balance ?? 0}</strong>
+                  <span>קרדיטים</span>
                 </div>
-                <div className="voice-engine-track">
-                  <span style={{ width: `${credits?.percentUsed ?? 0}%` }} />
-                </div>
-                <div className="voice-engine-grid">
-                  <div>
-                    <span>תוכנית</span>
-                    <strong>{credits?.tier || "לא ידוע"}</strong>
-                  </div>
-                  <div>
-                    <span>נוצל</span>
-                    <strong>{formatNumber(credits?.used)}</strong>
-                  </div>
-                </div>
-                <div className="voice-engine-footer">
-                  <span>{credits?.overageDisabled ? "חריגה כבויה" : "חריגה אפשרית"}</span>
-                  <span>איפוס ב: {formatReset(credits?.nextReset)}</span>
-                </div>
-              </>
-            ) : (
-              <p className="voice-engine-fallback">
-                {creditsStatus === "loading" ? "בודק חיבור ל-ElevenLabs..." : "אין מפתח ElevenLabs פעיל — מצב הדגמה."}
-              </p>
-            )}
-          </div>
+                <p className="voice-engine-fallback">כל קרדיט שווה 10 שניות שיר.</p>
+              </div>
+            )
+          )}
 
           <div className="price-box">
             <span>תשלום ללקוח</span>
