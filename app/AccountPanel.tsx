@@ -117,6 +117,25 @@ export function AccountPanel({ account }: { account: ReturnType<typeof useAccoun
     document.getElementById(id)?.scrollIntoView({ behavior: "smooth", block: "start" });
   };
 
+  // The wallet's actions may be opened from any page (home or the
+  // dedicated /pricing page) — navigate across pages when needed,
+  // scroll in place when already there.
+  const goToOrderSection = () => {
+    if (window.location.pathname === "/") {
+      scrollToSection("order");
+    } else {
+      window.location.href = "/#order";
+    }
+  };
+
+  const goToPricingPage = () => {
+    if (window.location.pathname === "/pricing") {
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    } else {
+      window.location.href = "/pricing";
+    }
+  };
+
   const submit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     setSubmitting(true);
@@ -224,11 +243,11 @@ export function AccountPanel({ account }: { account: ReturnType<typeof useAccoun
             onClose={() => setWalletOpen(false)}
             onBuyCredits={() => {
               setWalletOpen(false);
-              scrollToSection("pricing");
+              goToPricingPage();
             }}
             onNewSong={() => {
               setWalletOpen(false);
-              scrollToSection("order");
+              goToOrderSection();
             }}
           />
         )}

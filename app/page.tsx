@@ -1,6 +1,7 @@
 "use client";
 
 import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
+import Link from "next/link";
 import {
   AlertTriangle,
   ArrowLeft,
@@ -18,14 +19,13 @@ import {
   Lyrics,
   Mic,
   MusicNote,
-  Plus,
   PlayCircle,
   Refresh,
   Storefront,
 } from "./icons";
-import { AccountPanel } from "./AccountPanel";
 import { BillingModal } from "./BillingModal";
-import { PricingSection, PricingTab } from "./PricingSection";
+import { promptSignIn } from "./promptSignIn";
+import { SiteHeader } from "./SiteHeader";
 import { CREDITS_PER_SONG, PricingPlan, singleSongPlan } from "@/lib/pricing-catalog";
 import { useAccount } from "./useAccount";
 
@@ -243,7 +243,6 @@ export default function Home() {
   const [orderMode, setOrderMode] = useState<"demo" | "full">("full");
   const [idempotencyKey, setIdempotencyKey] = useState(() => crypto.randomUUID());
   const [checkoutPlan, setCheckoutPlan] = useState<PricingPlan | null>(null);
-  const [pricingTab, setPricingTab] = useState<PricingTab>("single");
   const [providerQuota, setProviderQuota] = useState<ProviderQuotaInfo | null>(null);
   const [providerQuotaStatus, setProviderQuotaStatus] = useState<"loading" | "ready" | "error">("loading");
   const isAdmin = account.credits?.isAdmin === true;
@@ -252,12 +251,6 @@ export default function Home() {
   const creditBalance = account.credits?.balance ?? 0;
   const hasEnoughCredits = isAdmin || creditBalance >= CREDITS_PER_SONG;
   const freeDemoUsed = account.credits?.freeDemoUsed === true;
-
-  const promptSignIn = useCallback(() => {
-    const trigger = document.getElementById("account-trigger-btn");
-    trigger?.scrollIntoView({ behavior: "smooth", block: "center" });
-    (trigger as HTMLButtonElement | null)?.click();
-  }, []);
 
   const goToSection = (id: string) => {
     document.getElementById(id)?.scrollIntoView({ behavior: "smooth", block: "start" });
@@ -459,24 +452,20 @@ export default function Home() {
 
   return (
     <main className="site-shell" dir="rtl">
-      <nav className="topbar" aria-label="ניווט ראשי">
-        <div className="topbar-start">
-          <a className="brand" href="#top" aria-label="מנגינה אישית">
-            <span className="brand-mark">
-              <MusicNote size={20} strokeWidth={2.1} />
-            </span>
-            <span>מנגינה אישית</span>
-          </a>
-
-          <div className="topbar-actions">
-            <a href="#how">איך זה עובד</a>
-            <a href="#pricing">מחירים</a>
-            <a href="#legal">מה מותר</a>
-          </div>
-        </div>
-
-        <div className="topbar-end">
-          {isAdmin && (
+      <SiteHeader
+        account={account}
+        homeHref="#top"
+        navLinks={[
+          { href: "#how", label: "איך זה עובד" },
+          { href: "/pricing", label: "מחירים" },
+          { href: "#legal", label: "מה מותר" },
+        ]}
+        onNewSong={() => {
+          startNewOrder();
+          goToSection("order");
+        }}
+        adminSlot={
+          isAdmin ? (
             <div className="admin-quota-pill" title="מסך ניהול — מלאי ספק המוזיקה">
               <Coin size={15} className="coin-icon" />
               <strong>
@@ -490,21 +479,9 @@ export default function Home() {
                 <Refresh size={12} />
               </button>
             </div>
-          )}
-          <button
-            className="nav-cta"
-            type="button"
-            onClick={() => {
-              startNewOrder();
-              goToSection("order");
-            }}
-          >
-            <Plus size={16} />
-            שיר חדש
-          </button>
-          <AccountPanel account={account} />
-        </div>
-      </nav>
+          ) : undefined
+        }
+      />
 
       <section id="top" className="hero-section">
         <div className="hero-copy">
@@ -607,8 +584,6 @@ export default function Home() {
           </div>
         </div>
       </section>
-
-      <PricingSection onSelectPlan={handleSelectPlan} onTabChange={setPricingTab} tab={pricingTab} />
 
       <section id="order" className="order-section">
         <div className="section-intro">
@@ -896,22 +871,10 @@ export default function Home() {
                       <button onClick={() => handleSelectPlan(singleSongPlan)} type="button">
                         רכישת שיר בודד
                       </button>
-                      <button
-                        onClick={() => {
-                          setPricingTab("packs");
-                          goToSection("pricing");
-                        }}
-                        type="button"
-                      >
+                      <button onClick={() => (window.location.href = "/pricing?tab=packs")} type="button">
                         צפייה בחבילות
                       </button>
-                      <button
-                        onClick={() => {
-                          setPricingTab("subscriptions");
-                          goToSection("pricing");
-                        }}
-                        type="button"
-                      >
+                      <button onClick={() => (window.location.href = "/pricing?tab=subscriptions")} type="button">
                         הצטרפות למנוי
                       </button>
                     </div>
@@ -1138,6 +1101,20 @@ export default function Home() {
               </div>
             ))}
           </div>
+        </div>
+      </section>
+
+      <section className="pricing-cta-band">
+        <div className="pricing-cta-band-inner">
+          <div className="pricing-cta-band-copy">
+            <h3>רוצים לראות את כל אפשרויות הרכישה?</h3>
+            <p>שיר בודד, חבילות שירים או מנוי חודשי — כל המחירים והחיסכון במקום אחד.</p>
+          </div>
+          <Link className="pricing-cta-band-button" href="/pricing">
+            <Coin size={18} />
+            למעבר לעמוד המחירים
+            <ArrowLeft size={16} />
+          </Link>
         </div>
       </section>
 

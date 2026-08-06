@@ -2,14 +2,28 @@
 
 import { useState } from "react";
 import { PricingPlan, creditPacks, pricingFaq, singleSongPlan, subscriptionPlans } from "@/lib/pricing-catalog";
-import { CheckSmall, ChevronDown } from "./icons";
+import { CheckSmall, ChevronDown, Coin, MusicNote, Refresh } from "./icons";
 
 export type PricingTab = "single" | "packs" | "subscriptions";
 
+type IconComponent = (props: { size?: number }) => React.JSX.Element;
+
+const TAB_ICON: Record<PricingTab, IconComponent> = {
+  single: MusicNote,
+  packs: Coin,
+  subscriptions: Refresh,
+};
+
 function PricingCard({ plan, onSelect }: { plan: PricingPlan; onSelect: (plan: PricingPlan) => void }) {
+  const Icon = TAB_ICON[plan.isSubscription ? "subscriptions" : plan.productType === "pack" ? "packs" : "single"];
+
   return (
     <div className={plan.badge ? "pricing-card pricing-card--featured" : "pricing-card"}>
       {plan.badge && <span className="pricing-card-badge">{plan.badge}</span>}
+
+      <span className="pricing-card-icon">
+        <Icon size={20} />
+      </span>
 
       <h3 className="pricing-card-name">{plan.name}</h3>
 
@@ -46,6 +60,12 @@ function PricingCard({ plan, onSelect }: { plan: PricingPlan; onSelect: (plan: P
   );
 }
 
+const TABS: Array<{ id: PricingTab; label: string }> = [
+  { id: "single", label: "שיר בודד" },
+  { id: "packs", label: "חבילות שירים" },
+  { id: "subscriptions", label: "מנויים חודשיים" },
+];
+
 export function PricingSection({
   tab,
   onTabChange,
@@ -58,29 +78,22 @@ export function PricingSection({
   const [openFaqIndex, setOpenFaqIndex] = useState<number | null>(null);
 
   return (
-    <section id="pricing" className="pricing-section">
-      <div className="section-intro">
-        <p className="eyebrow">מחירים</p>
-        <h2>בוחרים איך לקבל את השיר שלכם.</h2>
-        <p>שיר בודד, חבילה שחוסכת לכם, או מנוי חודשי — כל הדרכים נותנות קרדיטים לאותה מערכת פשוטה.</p>
-      </div>
-
-      <div className="pricing-tabs" role="tablist">
-        <button aria-selected={tab === "single"} className={tab === "single" ? "active" : ""} onClick={() => onTabChange("single")} role="tab" type="button">
-          שיר בודד
-        </button>
-        <button aria-selected={tab === "packs"} className={tab === "packs" ? "active" : ""} onClick={() => onTabChange("packs")} role="tab" type="button">
-          חבילות שירים
-        </button>
-        <button
-          aria-selected={tab === "subscriptions"}
-          className={tab === "subscriptions" ? "active" : ""}
-          onClick={() => onTabChange("subscriptions")}
-          role="tab"
-          type="button"
-        >
-          מנויים חודשיים
-        </button>
+    <div className="pricing-widget">
+      <div className="pricing-tabs-row">
+        <div className="pricing-tabs" role="tablist">
+          {TABS.map((item) => (
+            <button
+              aria-selected={tab === item.id}
+              className={tab === item.id ? "active" : ""}
+              key={item.id}
+              onClick={() => onTabChange(item.id)}
+              role="tab"
+              type="button"
+            >
+              {item.label}
+            </button>
+          ))}
+        </div>
       </div>
 
       {tab === "single" && (
@@ -126,6 +139,6 @@ export function PricingSection({
           );
         })}
       </div>
-    </section>
+    </div>
   );
 }
