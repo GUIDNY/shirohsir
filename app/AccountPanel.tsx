@@ -3,7 +3,7 @@
 import { FormEvent, useState } from "react";
 import { useAccount } from "./useAccount";
 import { ChevronDown, Loader, UserCircle } from "./icons";
-import { BillingModal } from "./BillingModal";
+import { CreditWalletModal } from "./CreditWalletModal";
 import { MySongsModal } from "./MySongsModal";
 
 type Mode = "signIn" | "signUp";
@@ -109,9 +109,13 @@ export function AccountPanel({ account }: { account: ReturnType<typeof useAccoun
   const [password, setPassword] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [confirmationSent, setConfirmationSent] = useState(false);
-  const [billingOpen, setBillingOpen] = useState(false);
+  const [walletOpen, setWalletOpen] = useState(false);
   const [songsOpen, setSongsOpen] = useState(false);
   const [referralOpen, setReferralOpen] = useState(false);
+
+  const scrollToSection = (id: string) => {
+    document.getElementById(id)?.scrollIntoView({ behavior: "smooth", block: "start" });
+  };
 
   const submit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -194,11 +198,11 @@ export function AccountPanel({ account }: { account: ReturnType<typeof useAccoun
               <button
                 type="button"
                 onClick={() => {
-                  setBillingOpen(true);
+                  setWalletOpen(true);
                   setMenuOpen(false);
                 }}
               >
-                הוספת יתרה
+                הקרדיטים שלי
               </button>
             )}
             <button
@@ -214,7 +218,20 @@ export function AccountPanel({ account }: { account: ReturnType<typeof useAccoun
           </div>
         )}
 
-        {billingOpen && <BillingModal account={account} onClose={() => setBillingOpen(false)} />}
+        {walletOpen && (
+          <CreditWalletModal
+            account={account}
+            onClose={() => setWalletOpen(false)}
+            onBuyCredits={() => {
+              setWalletOpen(false);
+              scrollToSection("pricing");
+            }}
+            onNewSong={() => {
+              setWalletOpen(false);
+              scrollToSection("order");
+            }}
+          />
+        )}
         {songsOpen && <MySongsModal account={account} onClose={() => setSongsOpen(false)} />}
         {referralOpen && <ReferralModal account={account} onClose={() => setReferralOpen(false)} />}
       </div>
@@ -223,7 +240,12 @@ export function AccountPanel({ account }: { account: ReturnType<typeof useAccoun
 
   return (
     <div className="account-widget">
-      <button className="account-pill account-trigger" type="button" onClick={() => setOpen((v) => !v)}>
+      <button
+        className="account-pill account-trigger"
+        id="account-trigger-btn"
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+      >
         התחברות
       </button>
 

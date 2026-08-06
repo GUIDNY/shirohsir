@@ -6,11 +6,15 @@ import { supabase } from "@/lib/supabase-client";
 
 type AccountCredits = {
   balance: number;
+  songsAvailable: number;
+  leftoverCredits: number;
+  expiringSoon: { amount: number; date: string } | null;
   isAdmin: boolean;
   unlimited: boolean;
-  subscription: { plan: string; status: string } | null;
+  subscription: { plan: string; status: string; current_period_end: string; cancel_at_period_end: boolean } | null;
   referralCode: string | null;
   shareBonusClaimed: boolean;
+  freeDemoUsed: boolean;
 };
 
 export function useAccount() {
@@ -42,11 +46,15 @@ export function useAccount() {
       const data = await response.json();
       setCredits({
         balance: data.balance,
+        songsAvailable: data.songsAvailable ?? 0,
+        leftoverCredits: data.leftoverCredits ?? 0,
+        expiringSoon: data.expiringSoon ?? null,
         isAdmin: data.isAdmin === true,
         unlimited: data.unlimited === true,
         subscription: data.subscription,
         referralCode: data.referralCode ?? null,
         shareBonusClaimed: data.shareBonusClaimed === true,
+        freeDemoUsed: data.freeDemoUsed === true,
       });
     } catch {
       setCredits(null);

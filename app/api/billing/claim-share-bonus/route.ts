@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getUserFromRequest } from "@/lib/auth-user";
-import { SHARE_BONUS_CREDITS } from "@/lib/billing-catalog";
+import { SHARE_BONUS_CREDITS } from "@/lib/pricing-catalog";
 import { createServerClient } from "@/lib/supabase-server";
 
 export async function POST(request: NextRequest) {

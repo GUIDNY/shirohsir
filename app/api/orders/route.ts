@@ -1,63 +1,27 @@
+import { randomUUID } from "node:crypto";
 import { NextRequest, NextResponse } from "next/server";
 import { getUserFromRequest } from "@/lib/auth-user";
 import { isAdminUser } from "@/lib/is-admin";
+import { CREDITS_PER_SONG, FREE_DEMO, MAX_VERSION_SECONDS } from "@/lib/pricing-catalog";
 import { createServerClient } from "@/lib/supabase-server";
+import { createSongVersion, GeneratedVersion, MusicProviderError, OrderContent, text, uploadSongAudio } from "@/lib/song-generation";
 
-const SECONDS_PER_CREDIT = 10;
-const MIN_SONG_SECONDS = 10;
-const MAX_SONG_SECONDS = 60;
-const DEFAULT_SONG_SECONDS = 20;
-
-function clampSongSeconds(value: number | undefined) {
-  const raw = typeof value === "number" && Number.isFinite(value) ? value : DEFAULT_SONG_SECONDS;
-  const rounded = Math.round(raw / SECONDS_PER_CREDIT) * SECONDS_PER_CREDIT;
-
-  return Math.min(Math.max(rounded, MIN_SONG_SECONDS), MAX_SONG_SECONDS);
-}
-
-function creditsForSongSeconds(seconds: number) {
-  return Math.max(1, Math.ceil(seconds / SECONDS_PER_CREDIT));
-}
-
-type OrderPayload = {
-  songType?: string;
-  recipient?: string;
-  occasion?: string;
-  style?: string;
-  mood?: string;
-  vocalist?: string;
-  languageRegister?: string;
-  lyricStructure?: string;
-  pronunciation?: string;
-  story?: string;
-  mustInclude?: string;
-  avoid?: string;
+type OrderPayload = OrderContent & {
   customerName?: string;
   email?: string;
   phone?: string;
   consent?: boolean;
-  songLengthSeconds?: number;
+  mode?: "demo" | "full";
+  idempotencyKey?: string;
 };
 
 type OrderResponse = {
   orderId: string;
-  provider: string;
-  status: string;
-  mode: "demo" | "live";
+  mode: "demo" | "full";
   promptPreview: string;
-  audioDataUrl?: string;
-  audioContentType?: string;
-  downloadFileName?: string;
+  versions: GeneratedVersion[];
+  refunded?: boolean;
 };
-
-class MusicProviderError extends Error {
-  constructor(
-    public providerStatus: number,
-    public providerMessage: string,
-  ) {
-    super("ElevenLabs music request failed");
-  }
-}
 
 const requiredFields: Array<keyof OrderPayload> = [
   "recipient",
@@ -73,461 +37,17 @@ const requiredFields: Array<keyof OrderPayload> = [
   "phone",
 ];
 
-function text(value: unknown) {
-  return typeof value === "string" ? value.trim().slice(0, 1200) : "";
-}
-
-const styleDirections: Record<string, string> = {
-  "פופ ישראלי עכשווי ונקי":
-    "Contemporary Israeli pop, warm piano/guitar, light electronic drums, polished radio feel, 92-108 BPM.",
-  "בלדה ישראלית מרגשת":
-    "Emotional Israeli ballad, piano and acoustic guitar, gradual lift, intimate vocal, 72-86 BPM.",
-  "ים תיכוני עדין ומכובד":
-    "Gentle Mediterranean Israeli style, darbuka touches, oud or nylon guitar, tasteful and not caricatured, 96-112 BPM.",
-  "אקוסטי חם ומשפחתי":
-    "Warm acoustic arrangement, nylon guitar, soft percussion, close vocal, natural family-event feeling, 82-98 BPM.",
-  "היפ הופ ישראלי קליל":
-    "Light Israeli hip hop/pop rap, conversational Hebrew flow, clean beat, catchy sung hook, 88-100 BPM.",
-  "ג'ינגל קצר לעסק":
-    "Compact advertising jingle, immediate melodic hook, clear brand name, bright instruments, 110-128 BPM.",
-};
-
-const moodDirections: Record<string, string> = {
-  "מרגש אבל לא כבד": "moving and sincere, but not sad or heavy",
-  "שמח וקופצני": "happy, energetic, danceable, with a smile in the vocal delivery",
-  "מצחיק ואישי": "playful, personal, witty, but never mocking or childish",
-  "יוקרתי ונקי": "premium, restrained, elegant, clear diction, no noisy production",
-  "נוסטלגי וחם": "nostalgic, warm, memory-driven, with a sense of shared history",
-  "מתוק לילדים": "sweet, simple, child-friendly, clear words, no baby talk",
-};
-
-const vocalistDirections: Record<string, string> = {
-  "זמרת ישראלית חמה": "female Israeli vocalist, warm clear diction, natural Hebrew phrasing",
-  "זמר ישראלי חם": "male Israeli vocalist, warm clear diction, natural Hebrew phrasing",
-  "דואט גבר ואישה": "male and female duet, gentle harmonies, clear call-and-response moments",
-  "קולות קבוצה": "small group vocals in the chorus, singalong feeling, clear lead vocal in verses",
-  "קול צעיר ונקי": "young clean vocal, bright and friendly, suitable for school or birthday",
-  "קול בוגר ומכובד": "mature respectful vocal, calm and confident, suitable for family or business",
-};
-
-const languageDirections: Record<string, string> = {
-  "עברית ישראלית מדוברת":
-    "Use natural modern Israeli Hebrew, like people actually speak in Israel. Avoid translationese and overly formal wording.",
-  "עברית חגיגית ונקייה":
-    "Use polished festive Hebrew that still sounds singable and contemporary. Avoid biblical stiffness.",
-  "עברית קלילה עם סלנג עדין":
-    "Use light everyday Hebrew with only gentle slang where it feels natural. Do not overdo slang.",
-  "עברית לילדים":
-    "Use simple, clear Hebrew that children can sing. Short sentences, concrete images, no babyish wording.",
-};
-
-function directionFor(map: Record<string, string>, value: unknown) {
-  const key = text(value);
-
-  return map[key] || key || "not specified";
-}
-
-function line(value: string, fallback = "") {
-  return (value || fallback).replace(/\s+/g, " ").trim().slice(0, 58);
-}
-
-function firstSentence(value: unknown) {
-  const clean = text(value).replace(/\s+/g, " ");
-  const [sentence] = clean.split(/[.!?。！？\n]/);
-
-  return line(sentence, "יש סיפור קטן שכולם זוכרים");
-}
-
-function storyLyricLine(order: OrderPayload) {
-  const story = text(order.story);
-  const occasion = text(order.occasion);
-  const source = `${story} ${occasion}`;
-
-  if (/סקי|שלג|גולש|גולשים|חורף|עונה/i.test(source)) {
-    return "השלג כבר קורא, וכולם מוכנים";
-  }
-
-  if (/משפחה|חברים|חברות|אוהב|אוהבת|אהבה/i.test(source)) {
-    return "עם כל האנשים שאוהבים אותך";
-  }
-
-  if (/עסק|מותג|לקוח|לקוחות|קמפיין|פרסום|משרד|משרדים/i.test(source)) {
-    return "המסר כבר ברור, הקצב באוויר";
-  }
-
-  if (/סיום|שנה|כיתה|שכבה|גן|בית ספר|טקס/i.test(source)) {
-    return "צעד אחר צעד גדלנו ביחד";
-  }
-
-  const raw = firstSentence(story);
-
-  if (/[A-Za-z]/.test(raw) || raw.split(/\s+/).some((word) => word.length > 10)) {
-    return "הרגע הזה נשאר איתנו בלב";
-  }
-
-  return raw;
-}
-
-function subjectForLyrics(order: OrderPayload) {
-  const pronunciation = text(order.pronunciation);
-
-  return line(pronunciation || text(order.recipient), "השמחה הזאת");
-}
-
-function occasionHook(order: OrderPayload) {
-  const occasion = text(order.occasion);
-
-  if (/סקי|שלג|חורף|גולש|גולשים/i.test(occasion)) {
-    return "העונה מתחילה";
-  }
-
-  if (/יום הולדת|הולדת|birthday/i.test(occasion)) {
-    return "מזל טוב";
-  }
-
-  if (/חתונ|אהבה|זוג/i.test(occasion)) {
-    return "לחיי האהבה";
-  }
-
-  if (/סיום|שנה|טקס|בית ספר|גן/i.test(occasion)) {
-    return "איזו שנה יפה";
-  }
-
-  if (/עסק|מותג|קמפיין|פרסום|ג'ינגל|ג׳ינגל|גינגל/i.test(occasion)) {
-    return "זה השם שנשאר";
-  }
-
-  return line(occasion, "הרגע הזה");
-}
-
-function mustIncludeLine(order: OrderPayload) {
-  const include = text(order.mustInclude);
-
-  if (!include) {
-    return "";
-  }
-
-  if (/פותחים עונה/i.test(include) && /משרד|משרדים/i.test(include)) {
-    return "פותחים עונה עם כל הצוותים";
-  }
-
-  return line(include);
-}
-
-function buildHebrewLyrics(order: OrderPayload) {
-  const subject = subjectForLyrics(order);
-  const hook = occasionHook(order);
-  const detail = storyLyricLine(order);
-  const include = mustIncludeLine(order);
-
-  if (order.songType === "business") {
-    return [
-      "[Hook]",
-      `${subject}, ${hook}`,
-      include || "קל לזכור, נעים לשמוע",
-      "[Verse]",
-      `${detail}`,
-      "[Hook]",
-      `${subject}, ${hook}`,
-    ].join("\n");
-  }
-
-  if (order.songType === "graduation") {
-    return [
-      "[Verse]",
-      `${hook}, כולנו כאן ביחד`,
-      `${detail}`,
-      "[Chorus]",
-      include || "כל צעד קטן הפך לזיכרון",
-      "שרים בקול, עם לב גדול",
-      `${subject}, היום הזה שלנו`,
-    ].join("\n");
-  }
-
-  if (order.lyricStructure === "פזמון פתיחה ישר לעניין") {
-    return [
-      "[Chorus]",
-      `${hook} ${subject}`,
-      include || "הלב שלנו שר אליך",
-      "[Verse]",
-      `${detail}`,
-      "[Chorus]",
-      `${hook} ${subject}`,
-    ].join("\n");
-  }
-
-  if (order.lyricStructure === "ברכה אישית מרגשת") {
-    return [
-      "[Verse]",
-      `${subject}, היום חושבים עליך`,
-      `${detail}`,
-      "[Chorus]",
-      include || "שיהיה לך אור בכל הדרך",
-      `${hook} מכל הלב`,
-      "אנחנו כאן איתך",
-    ].join("\n");
-  }
-
-  return [
-    "[Verse]",
-    `${subject}, היום הזה כולו שלך`,
-    `${detail}`,
-    "[Chorus]",
-    include || `${hook}, שרים מכל הלב`,
-    "רגע קטן הופך לשיר",
-    `${subject}, האור שלך נשאר איתנו`,
-  ].join("\n");
-}
-
-type NakdanToken = {
-  nakdan?: { options?: Array<{ w?: string }>; sep?: boolean };
-  str?: string;
-};
-
-async function addNiqqudToLine(line: string): Promise<string> {
-  const trimmed = line.trim();
-
-  // Structure tags like [Verse]/[Chorus]/[Hook] are ElevenLabs formatting,
-  // not Hebrew lyrics — leave them untouched.
-  if (!trimmed || /^\[[^\]]+\]$/.test(trimmed) || !/[א-ת]/.test(trimmed)) {
-    return line;
-  }
-
-  try {
-    const response = await fetch("https://nakdan-u1-0.loadbalancer.dicta.org.il/api", {
-      method: "POST",
-      headers: { "Content-Type": "application/json;charset=UTF-8" },
-      body: JSON.stringify({
-        task: "nakdan",
-        genre: "modern",
-        data: line,
-        addmorph: false,
-        keepqq: false,
-        nodageshdefmem: false,
-        patachma: false,
-        keepmetagim: false,
-        useTokenization: true,
-      }),
-      signal: AbortSignal.timeout(6000),
-    });
-
-    if (!response.ok) {
-      return line;
-    }
-
-    const payload = (await response.json()) as { data?: NakdanToken[] };
-
-    if (!payload.data || payload.data.length === 0) {
-      return line;
-    }
-
-    return payload.data
-      .map((token) => token.nakdan?.options?.[0]?.w || token.str || "")
-      .join("")
-      .replace(/\|/g, "");
-  } catch {
-    // Diacritization is a quality nice-to-have, not required — never let a
-    // slow/unreachable Nakdan API block or break song generation.
-    return line;
-  }
-}
-
-async function addNiqqud(lyrics: string): Promise<string> {
-  const lines = lyrics.split("\n");
-  const vocalized = await Promise.all(lines.map((line) => addNiqqudToLine(line)));
-
-  return vocalized.join("\n");
-}
-
-function contentTypeForOutputFormat(outputFormat: string) {
-  if (outputFormat.startsWith("wav")) {
-    return "audio/wav";
-  }
-
-  if (outputFormat.startsWith("pcm")) {
-    return "audio/wav";
-  }
-
-  return "audio/mpeg";
-}
-
-function cleanApiKey(value: string | undefined) {
-  if (!value) {
-    return "";
-  }
-
-  const withoutEnvName = value.replace(/^\s*(?:ELEVENLABS_API_KEY|ELEVEN_API_KEY|EVEANLABS_API_KEY|API_KEY|XI_API_KEY)\s*=\s*/i, "");
-  const withoutWrappingQuotes = withoutEnvName.trim().replace(/^["']|["']$/g, "");
-
-  return withoutWrappingQuotes.replace(/[^\x20-\x7e]/g, "");
-}
-
-function arrayBufferToBase64(buffer: ArrayBuffer) {
-  const bytes = new Uint8Array(buffer);
-  const chunkSize = 0x8000;
-  let binary = "";
-
-  for (let index = 0; index < bytes.length; index += chunkSize) {
-    const chunk = bytes.subarray(index, index + chunkSize);
-    binary += String.fromCharCode(...chunk);
-  }
-
-  return btoa(binary);
-}
-
-function safeFileName(value: string) {
-  return (
-    value
-      .trim()
-      .replace(/[\\/:*?"<>|]+/g, "-")
-      .replace(/\s+/g, "-")
-      .slice(0, 80) || "custom-song"
-  );
-}
-
-async function createElevenLabsSong(order: OrderPayload, songSeconds: number): Promise<OrderResponse> {
-  const apiKey = cleanApiKey(
-    process.env.ELEVENLABS_API_KEY ||
-      process.env.ELEVEN_API_KEY ||
-      process.env.EVEANLABS_API_KEY ||
-      process.env.API_KEY ||
-      process.env.XI_API_KEY,
-  );
-  const outputFormat = process.env.ELEVENLABS_OUTPUT_FORMAT || "mp3_44100_128";
-  const apiUrl =
-    process.env.ELEVENLABS_MUSIC_API_URL ||
-    `https://api.elevenlabs.io/v1/music/stream?output_format=${encodeURIComponent(outputFormat)}`;
-  const musicLengthMs = songSeconds * 1000;
-  const modelId = process.env.ELEVENLABS_MUSIC_MODEL_ID || "music_v2";
-  const lyrics = buildHebrewLyrics(order);
-  const positiveStyles = [
-    directionFor(styleDirections, order.style),
-    directionFor(moodDirections, order.mood),
-    directionFor(vocalistDirections, order.vocalist),
-    directionFor(languageDirections, order.languageRegister),
-    "clear modern Israeli Hebrew pronunciation",
-    "short singable Hebrew lines",
-    "compact 20 second song with immediate vocals",
-  ];
-  const negativeStyles = [
-    "gibberish Hebrew",
-    "transliterated Hebrew",
-    "English lyrics",
-    "fake Hebrew words",
-    "overly dramatic AI poetry",
-    "imitating a known artist",
-    "long instrumental intro",
-  ];
-
-  if (!apiKey) {
-    return {
-      orderId: `demo_${Date.now()}`,
-      provider: "elevenlabs-demo",
-      status: "missing_elevenlabs_api_key",
-      mode: "demo",
-      promptPreview: lyrics.slice(0, 420),
-    };
-  }
-
-  // Hebrew without niqqud is genuinely ambiguous for a singing model — the
-  // same letters can be several different words depending on the vowels.
-  // Dicta's Nakdan (a free, established Hebrew diacritization service) adds
-  // niqqud before we hand the lyrics to ElevenLabs. Falls back to the plain
-  // text line-by-line on any failure, so a slow/unreachable Nakdan never
-  // blocks or breaks song generation.
-  const vocalizedLyrics = await addNiqqud(lyrics);
-
-  const providerResponse = await fetch(apiUrl, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "xi-api-key": apiKey,
-    },
-    body: JSON.stringify({
-      composition_plan: {
-        chunks: [
-          {
-            text: vocalizedLyrics,
-            duration_ms: musicLengthMs,
-            positive_styles: positiveStyles,
-            negative_styles: negativeStyles,
-            context_adherence: "high",
-          },
-        ],
-      },
-      model_id: modelId,
-    }),
-  });
-
-  if (!providerResponse.ok) {
-    const providerError = await providerResponse.text();
-
-    throw new MusicProviderError(providerResponse.status, providerError.slice(0, 500));
-  }
-
-  const audioBuffer = await providerResponse.arrayBuffer();
-  const audioContentType =
-    providerResponse.headers.get("content-type") || contentTypeForOutputFormat(outputFormat);
-  const songId = providerResponse.headers.get("song-id");
-  const base64 = arrayBufferToBase64(audioBuffer);
-
-  return {
-    orderId: songId || `eleven_${Date.now()}`,
-    provider: "elevenlabs",
-    status: "audio_ready",
-    mode: "live",
-    promptPreview: vocalizedLyrics.slice(0, 420),
-    audioDataUrl: `data:${audioContentType};base64,${base64}`,
-    audioContentType,
-    downloadFileName: `${safeFileName(text(order.recipient))}.mp3`,
-  };
-}
-
-async function uploadSongAudio(
-  supabase: ReturnType<typeof createServerClient>,
-  userId: string,
+function orderInsertRow(
   orderId: string,
-  audioDataUrl: string,
-  contentType: string,
-): Promise<string | null> {
-  try {
-    const base64 = audioDataUrl.split(",")[1];
-
-    if (!base64) {
-      return null;
-    }
-
-    const bytes = Buffer.from(base64, "base64");
-    const extension = contentType.includes("wav") ? "wav" : "mp3";
-    const path = `${userId}/${orderId}.${extension}`;
-
-    const { error } = await supabase.storage.from("songs").upload(path, bytes, {
-      contentType,
-      upsert: true,
-    });
-
-    if (error) {
-      console.error("Failed to upload song audio:", error.message);
-      return null;
-    }
-
-    return path;
-  } catch (error) {
-    console.error("Failed to upload song audio:", error instanceof Error ? error.message : error);
-    return null;
-  }
-}
-
-async function persistOrder(
-  supabase: ReturnType<typeof createServerClient>,
   userId: string,
   order: OrderPayload,
-  response: OrderResponse,
+  mode: "demo" | "full",
+  promptPreview: string,
   songSeconds: number,
   creditsCost: number,
-  audioPath: string | null,
 ) {
-  const { error } = await supabase.from("orders").insert({
+  return {
+    id: orderId,
     user_id: userId,
     song_type: order.songType,
     recipient: text(order.recipient),
@@ -544,18 +64,12 @@ async function persistOrder(
     customer_name: text(order.customerName),
     customer_email: text(order.email),
     customer_phone: text(order.phone),
-    status: response.audioDataUrl ? "delivered" : "lyrics_ready",
-    provider: response.provider,
-    provider_order_id: response.orderId,
-    prompt_preview: response.promptPreview,
+    status: "delivered",
+    mode,
+    prompt_preview: promptPreview,
     song_length_seconds: songSeconds,
     credits_cost: creditsCost,
-    audio_url: audioPath,
-  });
-
-  if (error) {
-    console.error("Failed to persist order:", error.message);
-  }
+  };
 }
 
 export async function POST(request: NextRequest) {
@@ -569,24 +83,71 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  const songSeconds = clampSongSeconds(order.songLengthSeconds);
-  const creditsCost = creditsForSongSeconds(songSeconds);
   const user = await getUserFromRequest(request);
+
+  if (!user) {
+    return NextResponse.json({ error: "צריך להתחבר לפני יצירת שיר" }, { status: 401 });
+  }
+
   const admin = isAdminUser(user);
-  const supabase = user ? createServerClient() : null;
+  const supabase = createServerClient();
+  const mode: "demo" | "full" = order.mode === "demo" ? "demo" : "full";
 
   try {
-    if (user && supabase && !admin) {
+    if (mode === "demo") {
+      if (!admin) {
+        const { data: usedRow } = await supabase
+          .from("free_demo_usage")
+          .select("user_id")
+          .eq("user_id", user.id)
+          .maybeSingle();
+
+        if (usedRow) {
+          return NextResponse.json(
+            { error: "כבר יצרתם את הדמו החינמי שלכם — אפשר לרכוש שיר מלא.", code: "demo_already_used" },
+            { status: 409 },
+          );
+        }
+      }
+
+      const version = await createSongVersion(order, FREE_DEMO.seconds, "דמו");
+      const response: OrderResponse = {
+        orderId: `demo_${Date.now()}`,
+        mode: "demo",
+        promptPreview: version.promptPreview,
+        versions: [version],
+      };
+
+      if (!admin) {
+        await supabase.from("free_demo_usage").insert({ user_id: user.id });
+      }
+
+      return NextResponse.json(response);
+    }
+
+    // mode === "full"
+    const idempotencyKey = (order.idempotencyKey || "").trim();
+
+    if (!admin && !idempotencyKey) {
+      return NextResponse.json({ error: "בקשה לא תקינה" }, { status: 400 });
+    }
+
+    const orderId = randomUUID();
+
+    if (!admin) {
       const { error: spendError } = await supabase.rpc("spend_credits", {
         p_user_id: user.id,
-        p_amount: creditsCost,
-        p_reason: "order_spend",
+        p_amount: CREDITS_PER_SONG,
+        p_reason: "song_production",
+        p_order_id: orderId,
+        p_note: "יצירת שיר מלא",
+        p_idempotency_key: idempotencyKey,
       });
 
       if (spendError) {
         if (spendError.message.includes("insufficient_credits")) {
           return NextResponse.json(
-            { error: "אין מספיק קרדיטים ליצירת שיר נוסף", code: "insufficient_credits" },
+            { error: "חסרים לך קרדיטים להפקת השיר", code: "insufficient_credits", required: CREDITS_PER_SONG },
             { status: 402 },
           );
         }
@@ -595,34 +156,69 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    let response: OrderResponse;
+    const versions: GeneratedVersion[] = [];
 
     try {
-      response = await createElevenLabsSong(order, songSeconds);
+      versions.push(await createSongVersion(order, MAX_VERSION_SECONDS, "א"));
+      versions.push(await createSongVersion(order, MAX_VERSION_SECONDS, "ב"));
     } catch (generationError) {
-      if (user && supabase && !admin) {
-        // Generation failed after the credit was already spent — refund it.
-        await supabase.rpc("spend_credits", {
+      if (!admin) {
+        await supabase.rpc("grant_credits", {
           p_user_id: user.id,
-          p_amount: -creditsCost,
+          p_amount: CREDITS_PER_SONG,
           p_reason: "refund",
-          p_note: "generation failed",
+          p_note: "החזר בעקבות תקלה בהפקת השיר",
+          p_expires_at: null,
+          p_idempotency_key: `refund_${idempotencyKey}`,
         });
+      }
+
+      if (generationError instanceof MusicProviderError) {
+        return NextResponse.json(
+          { error: "תקלה זמנית בהפקת השיר — הקרדיטים הוחזרו לחשבון שלך. אפשר לנסות שוב.", refunded: true },
+          { status: 502 },
+        );
       }
 
       throw generationError;
     }
 
-    if (user && supabase) {
-      const audioPath =
-        response.audioDataUrl && response.audioContentType
-          ? await uploadSongAudio(supabase, user.id, response.orderId, response.audioDataUrl, response.audioContentType)
-          : null;
+    const uploadedPaths = await Promise.all(
+      versions.map((version) =>
+        version.audioDataUrl && version.audioContentType
+          ? uploadSongAudio(supabase, user.id, orderId, version.label, version.audioDataUrl, version.audioContentType)
+          : Promise.resolve(null),
+      ),
+    );
 
-      await persistOrder(supabase, user.id, order, response, songSeconds, admin ? 0 : creditsCost, audioPath);
+    const promptPreview = versions[0]?.promptPreview || "";
+    const { error: insertError } = await supabase
+      .from("orders")
+      .insert(orderInsertRow(orderId, user.id, order, "full", promptPreview, MAX_VERSION_SECONDS, admin ? 0 : CREDITS_PER_SONG));
+
+    if (insertError) {
+      console.error("Failed to persist order:", insertError.message);
     }
 
-    return NextResponse.json(response);
+    const { error: versionsError } = await supabase.from("song_versions").insert(
+      versions.map((version, index) => ({
+        order_id: orderId,
+        version_label: version.label,
+        audio_url: uploadedPaths[index],
+        credits_cost: 0,
+      })),
+    );
+
+    if (versionsError) {
+      console.error("Failed to persist song versions:", versionsError.message);
+    }
+
+    return NextResponse.json({
+      orderId,
+      mode: "full",
+      promptPreview,
+      versions,
+    } satisfies OrderResponse);
   } catch (error) {
     if (error instanceof MusicProviderError) {
       return NextResponse.json(

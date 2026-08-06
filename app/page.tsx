@@ -24,6 +24,9 @@ import {
   Storefront,
 } from "./icons";
 import { AccountPanel } from "./AccountPanel";
+import { BillingModal } from "./BillingModal";
+import { PricingSection, PricingTab } from "./PricingSection";
+import { CREDITS_PER_SONG, PricingPlan, singleSongPlan } from "@/lib/pricing-catalog";
 import { useAccount } from "./useAccount";
 
 type SongType = "gift" | "business" | "graduation";
@@ -46,11 +49,10 @@ type OrderPayload = {
   email: string;
   phone: string;
   consent: boolean;
-  songLengthSeconds: number;
 };
 
-type ApiResult = {
-  orderId: string;
+type SongVersion = {
+  label: string;
   provider: string;
   status: string;
   mode: "demo" | "live";
@@ -58,6 +60,13 @@ type ApiResult = {
   audioDataUrl?: string;
   audioContentType?: string;
   downloadFileName?: string;
+};
+
+type ApiResult = {
+  orderId: string;
+  mode: "demo" | "full";
+  promptPreview: string;
+  versions: SongVersion[];
 };
 
 // Admin-only operational data (the real music-provider quota) — never
@@ -119,10 +128,7 @@ const initialOrder: OrderPayload = {
   email: "",
   phone: "",
   consent: false,
-  songLengthSeconds: 20,
 };
-
-const songLengthOptions = [10, 20, 30, 45, 60];
 
 const styles = [
   "פופ ישראלי עכשווי ונקי",
@@ -234,11 +240,66 @@ export default function Home() {
   const [orderError, setOrderError] = useState<string | null>(null);
   const [result, setResult] = useState<ApiResult | null>(null);
   const [summaryOpenMobile, setSummaryOpenMobile] = useState(false);
+  const [orderMode, setOrderMode] = useState<"demo" | "full">("full");
+  const [idempotencyKey, setIdempotencyKey] = useState(() => crypto.randomUUID());
+  const [checkoutPlan, setCheckoutPlan] = useState<PricingPlan | null>(null);
+  const [pricingTab, setPricingTab] = useState<PricingTab>("single");
   const [providerQuota, setProviderQuota] = useState<ProviderQuotaInfo | null>(null);
   const [providerQuotaStatus, setProviderQuotaStatus] = useState<"loading" | "ready" | "error">("loading");
   const isAdmin = account.credits?.isAdmin === true;
   const isLiveProviderQuota = providerQuotaStatus === "ready" && providerQuota?.mode === "live";
   const accessToken = account.session?.access_token;
+  const creditBalance = account.credits?.balance ?? 0;
+  const hasEnoughCredits = isAdmin || creditBalance >= CREDITS_PER_SONG;
+  const freeDemoUsed = account.credits?.freeDemoUsed === true;
+
+  const promptSignIn = useCallback(() => {
+    const trigger = document.getElementById("account-trigger-btn");
+    trigger?.scrollIntoView({ behavior: "smooth", block: "center" });
+    (trigger as HTMLButtonElement | null)?.click();
+  }, []);
+
+  const goToSection = (id: string) => {
+    document.getElementById(id)?.scrollIntoView({ behavior: "smooth", block: "start" });
+  };
+
+  const startNewOrder = useCallback(() => {
+    setOrder(initialOrder);
+    setStep(0);
+    setStatus("idle");
+    setOrderError(null);
+    setResult(null);
+    setOrderMode("full");
+    setIdempotencyKey(crypto.randomUUID());
+  }, []);
+
+  const handleSelectPlan = (plan: PricingPlan) => {
+    if (!account.session) {
+      promptSignIn();
+      return;
+    }
+
+    setCheckoutPlan(plan);
+  };
+
+  const handleStartDemo = () => {
+    if (!account.session) {
+      promptSignIn();
+      return;
+    }
+
+    if (freeDemoUsed && !isAdmin) {
+      return;
+    }
+
+    setOrder(initialOrder);
+    setOrderMode("demo");
+    setStep(0);
+    setStatus("idle");
+    setOrderError(null);
+    setResult(null);
+    goToSection("order");
+  };
 
   // Admin-only operational view — never fetched or rendered for a regular
   // customer. See app/api/credits/route.ts, which 403s for non-admins too.
@@ -313,6 +374,11 @@ export default function Home() {
     setResult(null);
     setOrderError(null);
 
+    if (!account.session) {
+      promptSignIn();
+      return;
+    }
+
     const missingField = requiredOrderFields.find(({ key }) => !order[key]?.toString().trim());
 
     if (missingField) {
@@ -322,24 +388,40 @@ export default function Home() {
       return;
     }
 
+    if (orderMode === "full" && !hasEnoughCredits) {
+      // The insufficient-credits panel below the summary already covers
+      // this case — this is just a defensive guard against a stale
+      // balance if credits changed in another tab.
+      setOrderError("חסרים לך קרדיטים להפקת השיר");
+      setStatus("error");
+      return;
+    }
+
     setStatus("sending");
 
     try {
-      const headers: Record<string, string> = { "Content-Type": "application/json" };
-
-      if (account.session?.access_token) {
-        headers.Authorization = `Bearer ${account.session.access_token}`;
-      }
+      const headers: Record<string, string> = {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${account.session.access_token}`,
+      };
 
       const response = await fetch("/api/orders", {
         method: "POST",
         headers,
-        body: JSON.stringify(order),
+        body: JSON.stringify({ ...order, mode: orderMode, idempotencyKey }),
       });
 
-      if (response.status === 402) {
-        setOrderError("היתרה שלכם לא מספיקה ליצירת שיר נוסף כרגע. אפשר להוסיף יתרה מתפריט המשתמש.");
+      if (response.status === 409) {
+        setOrderError("כבר יצרתם את הדמו החינמי שלכם — אפשר לרכוש שיר מלא.");
         setStatus("error");
+        void account.refreshCredits();
+        return;
+      }
+
+      if (response.status === 402) {
+        setOrderError("חסרים לך קרדיטים להפקת השיר");
+        setStatus("error");
+        void account.refreshCredits();
         return;
       }
 
@@ -347,6 +429,14 @@ export default function Home() {
         setStep(1);
         setOrderError('חסרים פרטים בטופס — אפשר לעבור על שלב "מספרים את הסיפור" ולוודא שהכול מלא.');
         setStatus("error");
+        return;
+      }
+
+      if (response.status === 502) {
+        const data = await response.json().catch(() => null);
+        setOrderError(data?.error || "תקלה זמנית בהפקת השיר — הקרדיטים הוחזרו לחשבון שלך. אפשר לנסות שוב.");
+        setStatus("error");
+        void account.refreshCredits();
         return;
       }
 
@@ -358,6 +448,7 @@ export default function Home() {
       setResult(data);
       setStatus("ready");
       setStep(2);
+      setIdempotencyKey(crypto.randomUUID());
       void account.refreshCredits();
       void refreshProviderQuota();
     } catch {
@@ -379,6 +470,7 @@ export default function Home() {
 
           <div className="topbar-actions">
             <a href="#how">איך זה עובד</a>
+            <a href="#pricing">מחירים</a>
             <a href="#legal">מה מותר</a>
           </div>
         </div>
@@ -399,10 +491,17 @@ export default function Home() {
               </button>
             </div>
           )}
-          <a className="nav-cta" href="#order">
+          <button
+            className="nav-cta"
+            type="button"
+            onClick={() => {
+              startNewOrder();
+              goToSection("order");
+            }}
+          >
             <Plus size={16} />
             שיר חדש
-          </a>
+          </button>
           <AccountPanel account={account} />
         </div>
       </nav>
@@ -429,8 +528,8 @@ export default function Home() {
           </div>
           <dl className="trust-strip" aria-label="למה לבחור בנו">
             <div>
-              <dt>שיר אישי ב-30 ₪</dt>
-              <dd>מחיר קבוע וברור, ללא הפתעות.</dd>
+              <dt>שיר אישי ב-{singleSongPlan.priceIls} ₪</dt>
+              <dd>מחיר קבוע וברור, ומאזינים לדמו חינם לפני שמשלמים.</dd>
             </div>
             <div>
               <dt>שתי גרסאות לבחירה</dt>
@@ -489,6 +588,27 @@ export default function Home() {
           })}
         </div>
       </section>
+
+      <section id="demo" className="demo-hook-section">
+        <div className="demo-hook-card">
+          <span className="demo-hook-icon">
+            <PlayCircle size={22} />
+          </span>
+          <div className="demo-hook-copy">
+            <h2>שומעים לפני שמשלמים</h2>
+            <p>ספרו לנו כמה פרטים וקבלו דמו אישי של 20 שניות, ללא תשלום וללא התחייבות.</p>
+          </div>
+          <div className="demo-hook-actions">
+            <button className="primary-button" disabled={freeDemoUsed && !isAdmin} onClick={handleStartDemo} type="button">
+              <PlayCircle size={18} />
+              {freeDemoUsed && !isAdmin ? "כבר יצרתם את הדמו החינמי" : "יצירת דמו חינם"}
+            </button>
+            <span className="demo-hook-hint">אין צורך בכרטיס אשראי</span>
+          </div>
+        </div>
+      </section>
+
+      <PricingSection onSelectPlan={handleSelectPlan} onTabChange={setPricingTab} tab={pricingTab} />
 
       <section id="order" className="order-section">
         <div className="section-intro">
@@ -554,25 +674,12 @@ export default function Home() {
                 ))}
               </div>
 
-              <div className="length-picker">
-                <span className="length-picker-label">אורך השיר</span>
-                <div className="length-grid">
-                  {songLengthOptions.map((seconds) => (
-                    <label
-                      className={order.songLengthSeconds === seconds ? "length-card selected" : "length-card"}
-                      key={seconds}
-                    >
-                      <input
-                        checked={order.songLengthSeconds === seconds}
-                        name="songLengthSeconds"
-                        onChange={() => setField("songLengthSeconds", seconds)}
-                        type="radio"
-                      />
-                      <strong>{seconds} שנ&apos;</strong>
-                    </label>
-                  ))}
-                </div>
-              </div>
+              {orderMode === "demo" && (
+                <p className="demo-mode-note">
+                  <PlayCircle size={15} />
+                  יוצרים דמו חינם של 20 שניות — בלי תשלום ובלי התחייבות.
+                </p>
+              )}
 
               <button className="primary-button" type="button" onClick={() => setStep(1)}>
                 ממשיכים לסיפור
@@ -757,12 +864,12 @@ export default function Home() {
                   <strong>{order.style}</strong>
                 </div>
                 <div>
-                  <span>אורך</span>
-                  <strong>{order.songLengthSeconds} שניות</strong>
+                  <span>מה מקבלים</span>
+                  <strong>{orderMode === "demo" ? "דמו להאזנה באתר" : "שתי גרסאות"}</strong>
                 </div>
                 <div>
-                  <span>מחיר כולל</span>
-                  <strong>30 ₪</strong>
+                  <span>עלות</span>
+                  <strong>{orderMode === "demo" ? "חינם" : `${CREDITS_PER_SONG} קרדיטים`}</strong>
                 </div>
               </div>
 
@@ -779,20 +886,58 @@ export default function Home() {
                 </span>
               </label>
 
-              <button className="pay-button" disabled={status === "sending"} type="submit">
-                {status === "sending" ? <Loader size={18} /> : <Lock size={18} />}
-                {status === "sending" ? "יוצרים את השיר..." : 'יצירת השיר ב-30 ש"ח'}
-              </button>
+              {orderMode === "full" && !isAdmin && !hasEnoughCredits ? (
+                <div className="insufficient-credits-panel">
+                  <AlertTriangle size={20} />
+                  <div>
+                    <strong>חסרים לך קרדיטים להפקת השיר</strong>
+                    <p>להפקת שיר מלא נדרשים {CREDITS_PER_SONG} קרדיטים.</p>
+                    <div className="insufficient-credits-actions">
+                      <button onClick={() => handleSelectPlan(singleSongPlan)} type="button">
+                        רכישת שיר בודד
+                      </button>
+                      <button
+                        onClick={() => {
+                          setPricingTab("packs");
+                          goToSection("pricing");
+                        }}
+                        type="button"
+                      >
+                        צפייה בחבילות
+                      </button>
+                      <button
+                        onClick={() => {
+                          setPricingTab("subscriptions");
+                          goToSection("pricing");
+                        }}
+                        type="button"
+                      >
+                        הצטרפות למנוי
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                <>
+                  {orderMode === "full" && !isAdmin && (
+                    <p className="pay-hint">הפקת השיר המלא תשתמש ב-{CREDITS_PER_SONG} קרדיטים מהיתרה שלך.</p>
+                  )}
+                  <button className="pay-button" disabled={status === "sending"} type="submit">
+                    {status === "sending" ? <Loader size={18} /> : <Lock size={18} />}
+                    {status === "sending" ? "יוצרים את השיר..." : orderMode === "demo" ? "יצירת דמו חינם" : "אישור והפקת השיר"}
+                  </button>
+                </>
+              )}
 
               {result && (
                 <div className="api-result">
                   <CheckCircle size={20} />
                   <div>
-                    <strong>ההזמנה נשמרה בהצלחה!</strong>
+                    <strong>{result.mode === "demo" ? "הדמו שלכם מוכן!" : "השיר שלכם מוכן!"}</strong>
                     <span>
-                      {result.audioDataUrl
-                        ? "השיר שלכם מוכן — אפשר להאזין ולהוריד למטה."
-                        : "נמשיך לעדכן אתכם באזור האישי ברגע שהשיר מוכן."}
+                      {result.mode === "demo"
+                        ? "אפשר להאזין למטה — הדמו מיועד להאזנה באתר בלבד."
+                        : "שתי הגרסאות מוכנות — אפשר להאזין, להוריד ולשתף."}
                     </span>
                     {result.promptPreview && (
                       <div className="lyrics-preview">
@@ -800,14 +945,44 @@ export default function Home() {
                         <p>{result.promptPreview}</p>
                       </div>
                     )}
-                    {result.audioDataUrl && (
+                    {result.versions.some((version) => version.audioDataUrl) && (
                       <div className="audio-delivery">
-                        <audio controls src={result.audioDataUrl}>
-                          הדפדפן שלך לא תומך בנגן אודיו.
-                        </audio>
-                        <a download={result.downloadFileName || "custom-song.mp3"} href={result.audioDataUrl}>
-                          להורדת השיר
-                        </a>
+                        {result.versions.map((version) => (
+                          <div className="audio-delivery-version" key={version.label}>
+                            {result.versions.length > 1 && <span className="audio-delivery-label">גרסה {version.label}</span>}
+                            {version.audioDataUrl && (
+                              <>
+                                <audio controls src={version.audioDataUrl}>
+                                  הדפדפן שלך לא תומך בנגן אודיו.
+                                </audio>
+                                {result.mode === "full" && (
+                                  <a download={version.downloadFileName || "custom-song.mp3"} href={version.audioDataUrl}>
+                                    להורדת השיר
+                                  </a>
+                                )}
+                              </>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    )}
+
+                    {result.mode === "demo" && (
+                      <div className="demo-upsell">
+                        <strong>אהבתם את הכיוון? השיר המלא מחכה לכם</strong>
+                        <p>קבלו שתי גרסאות מלאות באורך של עד 3 דקות, מוכנות להורדה ולשיתוף.</p>
+                        <button
+                          className="primary-button"
+                          onClick={() => {
+                            setOrderMode("full");
+                            setResult(null);
+                            setStatus("idle");
+                            setStep(2);
+                          }}
+                          type="button"
+                        >
+                          קבלת השיר המלא
+                        </button>
                       </div>
                     )}
                   </div>
@@ -827,7 +1002,9 @@ export default function Home() {
           >
             <span>ההזמנה שלך</span>
             <span className="order-summary-toggle-end">
-              <span className="order-summary-toggle-price">30 ₪</span>
+              <span className="order-summary-toggle-price">
+                {orderMode === "demo" ? "חינם" : `${CREDITS_PER_SONG} קרדיטים`}
+              </span>
               <ChevronDown className="order-summary-toggle-chevron" size={16} />
             </span>
           </button>
@@ -841,16 +1018,16 @@ export default function Home() {
                 <dd>{selectedType.label}</dd>
               </div>
               <div>
-                <dt>אורך</dt>
-                <dd>{order.songLengthSeconds} שניות</dd>
-              </div>
-              <div>
                 <dt>מה מקבלים</dt>
-                <dd>שתי גרסאות</dd>
+                <dd>{orderMode === "demo" ? "דמו להאזנה" : "שתי גרסאות"}</dd>
               </div>
               <div>
-                <dt>מחיר כולל</dt>
-                <dd>30 ₪</dd>
+                <dt>עלות</dt>
+                <dd>{orderMode === "demo" ? "חינם" : `${CREDITS_PER_SONG} קרדיטים`}</dd>
+              </div>
+              <div>
+                <dt>היתרה שלך</dt>
+                <dd>{isAdmin ? "ללא הגבלה" : `${creditBalance} קרדיטים`}</dd>
               </div>
             </dl>
 
@@ -967,6 +1144,18 @@ export default function Home() {
       <a className="scroll-top-fab" href="#top" aria-label="חזרה לראש העמוד">
         <ArrowUp size={20} />
       </a>
+
+      {checkoutPlan && (
+        <BillingModal
+          account={account}
+          plan={checkoutPlan}
+          onClose={() => setCheckoutPlan(null)}
+          onSuccess={() => {
+            setCheckoutPlan(null);
+            goToSection("order");
+          }}
+        />
+      )}
     </main>
   );
 }

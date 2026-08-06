@@ -1,8 +1,11 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
-import { Loader } from "./icons";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { EXTRA_VERSION_CREDITS } from "@/lib/pricing-catalog";
+import { Loader, Plus } from "./icons";
 import { useAccount } from "./useAccount";
+
+type SongVersionAudio = { label: string; audioSignedUrl: string | null };
 
 type SongOrder = {
   id: string;
@@ -11,7 +14,7 @@ type SongOrder = {
   occasion: string;
   style: string;
   status: string;
-  provider: string;
+  mode: string;
   prompt_preview: string;
   song_length_seconds: number;
   credits_cost: number;
@@ -19,6 +22,7 @@ type SongOrder = {
   share_token: string | null;
   created_at: string;
   audioSignedUrl: string | null;
+  versions: SongVersionAudio[];
 };
 
 const songTypeLabels: Record<string, string> = {
@@ -140,12 +144,71 @@ function PostcardControls({
   );
 }
 
+function ExtraVersionButton({
+  order,
+  accessToken,
+  onCreated,
+  refreshCredits,
+}: {
+  order: SongOrder;
+  accessToken: string | undefined;
+  onCreated: (label: string) => void;
+  refreshCredits: () => void;
+}) {
+  const [pending, setPending] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const requestExtraVersion = async () => {
+    if (!accessToken) {
+      return;
+    }
+
+    setPending(true);
+    setError(null);
+
+    try {
+      const response = await fetch(`/api/orders/${order.id}/extra-version`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${accessToken}` },
+        body: JSON.stringify({ idempotencyKey: crypto.randomUUID() }),
+      });
+      const data = await response.json();
+
+      if (!response.ok) {
+        setError(data.error || "שגיאה ביצירת הגרסה הנוספת");
+        return;
+      }
+
+      onCreated(data.version.label);
+      refreshCredits();
+    } catch {
+      setError("שגיאה ביצירת הגרסה הנוספת");
+    } finally {
+      setPending(false);
+    }
+  };
+
+  if (order.mode === "demo") {
+    return null;
+  }
+
+  return (
+    <div className="extra-version-row">
+      <button className="postcard-create-btn" disabled={pending} onClick={() => void requestExtraVersion()} type="button">
+        {pending ? <Loader size={14} /> : <Plus size={14} />}
+        גרסה נוספת ({EXTRA_VERSION_CREDITS} קרדיטים)
+      </button>
+      {error && <p className="billing-error">{error}</p>}
+    </div>
+  );
+}
+
 export function MySongsModal({ account, onClose }: { account: ReturnType<typeof useAccount>; onClose: () => void }) {
   const [orders, setOrders] = useState<SongOrder[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const accessToken = account.session?.access_token;
 
-  useEffect(() => {
+  const loadOrders = useCallback(() => {
     if (!accessToken) {
       return;
     }
@@ -161,6 +224,10 @@ export function MySongsModal({ account, onClose }: { account: ReturnType<typeof 
       .then((data) => setOrders(data.orders))
       .catch(() => setError("לא הצלחנו לטעון את השירים שלך."));
   }, [accessToken]);
+
+  useEffect(() => {
+    loadOrders();
+  }, [loadOrders]);
 
   const applyPostcard = (orderId: string, shareToken: string, photoUrl: string) => {
     setOrders((current) =>
@@ -207,20 +274,38 @@ export function MySongsModal({ account, onClose }: { account: ReturnType<typeof 
 
                 <p className="song-card-lyrics">{order.prompt_preview}</p>
 
-                {order.audioSignedUrl ? (
-                  <div className="song-card-audio">
-                    <audio controls src={order.audioSignedUrl}>
-                      הדפדפן שלך לא תומך בנגן אודיו.
-                    </audio>
-                    <a download href={order.audioSignedUrl}>
-                      הורדה
-                    </a>
+                {order.versions.some((version) => version.audioSignedUrl) ? (
+                  <div className="song-card-versions">
+                    {order.versions.map((version, index) => (
+                      <div className="song-card-audio" key={`${version.label}-${index}`}>
+                        {version.label && order.versions.length > 1 && (
+                          <span className="song-card-version-label">גרסה {version.label}</span>
+                        )}
+                        {version.audioSignedUrl && (
+                          <>
+                            <audio controls src={version.audioSignedUrl}>
+                              הדפדפן שלך לא תומך בנגן אודיו.
+                            </audio>
+                            <a download href={version.audioSignedUrl}>
+                              הורדה
+                            </a>
+                          </>
+                        )}
+                      </div>
+                    ))}
                   </div>
                 ) : (
                   <p className="song-card-pending">
                     {order.status === "lyrics_ready" ? "מילים בלבד — אין קובץ אודיו שמור" : "אודיו לא זמין"}
                   </p>
                 )}
+
+                <ExtraVersionButton
+                  accessToken={accessToken}
+                  onCreated={() => loadOrders()}
+                  order={order}
+                  refreshCredits={() => void account.refreshCredits()}
+                />
 
                 <PostcardControls
                   accessToken={accessToken}
