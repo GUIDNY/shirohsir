@@ -35,15 +35,12 @@ type OrderStatus = "idle" | "sending" | "ready" | "error";
 type OrderPayload = {
   songType: SongType;
   recipient: string;
-  occasion: string;
-  style: string;
-  mood: string;
-  vocalist: string;
-  languageRegister: string;
-  lyricStructure: string;
-  pronunciation: string;
+  occasionChip: string;
+  occasionCustom: string;
   story: string;
   mustInclude: string;
+  moods: string[];
+  inspiration: string;
   avoid: string;
   customerName: string;
   email: string;
@@ -114,15 +111,12 @@ const songTypes: Array<{
 const initialOrder: OrderPayload = {
   songType: "gift",
   recipient: "",
-  occasion: "",
-  style: "פופ ישראלי עכשווי ונקי",
-  mood: "מרגש אבל לא כבד",
-  vocalist: "זמרת ישראלית חמה",
-  languageRegister: "עברית ישראלית מדוברת",
-  lyricStructure: "בית קצר ופזמון קליט",
-  pronunciation: "",
+  occasionChip: "",
+  occasionCustom: "",
   story: "",
   mustInclude: "",
+  moods: [],
+  inspiration: "",
   avoid: "",
   customerName: "",
   email: "",
@@ -130,33 +124,81 @@ const initialOrder: OrderPayload = {
   consent: false,
 };
 
-const styles = [
-  "פופ ישראלי עכשווי ונקי",
-  "בלדה ישראלית מרגשת",
-  "ים תיכוני עדין ומכובד",
-  "אקוסטי חם ומשפחתי",
-  "היפ הופ ישראלי קליל",
-  "ג'ינגל קצר לעסק",
+const OCCASION_CHIPS = ["יום הולדת", "חתונה", "זוגיות", "משפחה", "חבר/ה", "פרידה", "עסק", "אחר"];
+
+const MOOD_CHIPS: Array<{ id: string; label: string; emoji: string }> = [
+  { id: "מרגש", label: "מרגש", emoji: "❤️" },
+  { id: "מצחיק", label: "מצחיק", emoji: "😂" },
+  { id: "רומנטי", label: "רומנטי", emoji: "🥰" },
+  { id: "שמח", label: "שמח", emoji: "🎉" },
+  { id: "קצבי", label: "קצבי", emoji: "😎" },
 ];
 
-const moods = ["מרגש אבל לא כבד", "שמח וקופצני", "מצחיק ואישי", "יוקרתי ונקי", "נוסטלגי וחם", "מתוק לילדים"];
-const vocalists = ["זמרת ישראלית חמה", "זמר ישראלי חם", "דואט גבר ואישה", "קולות קבוצה", "קול צעיר ונקי", "קול בוגר ומכובד"];
-const languageRegisters = ["עברית ישראלית מדוברת", "עברית חגיגית ונקייה", "עברית קלילה עם סלנג עדין", "עברית לילדים"];
-const lyricStructures = ["בית קצר ופזמון קליט", "פזמון פתיחה ישר לעניין", "ג'ינגל עם סלוגן", "ברכה אישית מרגשת"];
+const MAX_MOODS = 2;
 
-const requiredOrderFields: Array<{ key: keyof OrderPayload; label: string }> = [
-  { key: "recipient", label: "שם/מותג שעליו השיר" },
-  { key: "occasion", label: "אירוע או מטרה" },
-  { key: "story", label: "הסיפור" },
-  { key: "customerName", label: "שם הלקוח" },
-  { key: "email", label: "אימייל" },
-  { key: "phone", label: "טלפון" },
-];
+function resolveOccasion(order: OrderPayload) {
+  return order.occasionChip === "אחר" ? order.occasionCustom.trim() : order.occasionChip;
+}
+
+// Drives both the client pre-submit check and which step to send the
+// customer back to if something's missing — recipient/occasion/story live
+// in step 1, contact details now live in step 3 (see spec: don't ask for
+// contact info while the customer is still telling the story).
+function getMissingFieldInfo(order: OrderPayload): { label: string; step: number } | null {
+  if (!order.recipient.trim()) {
+    return { label: "למי מכינים את השיר", step: 1 };
+  }
+
+  if (!order.occasionChip) {
+    return { label: "סוג האירוע", step: 1 };
+  }
+
+  if (order.occasionChip === "אחר" && !order.occasionCustom.trim()) {
+    return { label: "פירוט האירוע", step: 1 };
+  }
+
+  if (!order.story.trim()) {
+    return { label: "הסיפור", step: 1 };
+  }
+
+  if (!order.customerName.trim()) {
+    return { label: "השם שלך", step: 3 };
+  }
+
+  if (!order.email.trim()) {
+    return { label: "אימייל", step: 3 };
+  }
+
+  if (!order.phone.trim()) {
+    return { label: "טלפון", step: 3 };
+  }
+
+  return null;
+}
+
+function buildConfirmationSummary(order: OrderPayload) {
+  const occasion = resolveOccasion(order) || "האירוע שסיפרתם עליו";
+  const recipient = order.recipient.trim() || "מי שבחרתם";
+  const sentences = [`השיר הוא ל${recipient}, לרגל ${occasion}.`, "קראנו את הסיפור ששיתפתם ונשלב אותו במילות השיר."];
+
+  if (order.moods.length > 0) {
+    const moodsText = order.moods.join(" ו");
+    sentences.push(
+      order.inspiration.trim()
+        ? `נכין שיר שמרגיש ${moodsText}, בהשראת הסגנון של ${order.inspiration.trim()}.`
+        : `נכין שיר שמרגיש ${moodsText}.`,
+    );
+  } else if (order.inspiration.trim()) {
+    sentences.push(`נכין שיר בהשראת הסגנון של ${order.inspiration.trim()}.`);
+  }
+
+  return sentences.join(" ");
+}
 
 const processSteps = [
   { title: "בוחרים סוג שיר", detail: "יום הולדת, חתונה, זוגיות, עסק או כל אירוע אחר." },
   { title: "מספרים את הסיפור", detail: "מוסיפים שמות, זיכרונות, בדיחות ורגעים מיוחדים." },
-  { title: "מאשרים את המילים", detail: "עוברים על הטקסט ומבקשים תיקונים לפני הפקת השיר." },
+  { title: "מאשרים את המילים", detail: "עוברים על מה שהבנו ומאשרים לפני ההפקה." },
   { title: "מקבלים את השיר", detail: "מורידים את הגרסאות המוכנות ומשתפים עם מי שאוהבים." },
 ];
 
@@ -240,6 +282,7 @@ export default function Home() {
   const [orderError, setOrderError] = useState<string | null>(null);
   const [result, setResult] = useState<ApiResult | null>(null);
   const [summaryOpenMobile, setSummaryOpenMobile] = useState(false);
+  const [advancedOpen, setAdvancedOpen] = useState(false);
   const [orderMode, setOrderMode] = useState<"demo" | "full">("full");
   const [idempotencyKey, setIdempotencyKey] = useState(() => crypto.randomUUID());
   const [checkoutPlan, setCheckoutPlan] = useState<PricingPlan | null>(null);
@@ -263,6 +306,7 @@ export default function Home() {
     setOrderError(null);
     setResult(null);
     setOrderMode("full");
+    setAdvancedOpen(false);
     setIdempotencyKey(crypto.randomUUID());
   }, []);
 
@@ -291,6 +335,7 @@ export default function Home() {
     setStatus("idle");
     setOrderError(null);
     setResult(null);
+    setAdvancedOpen(false);
     goToSection("order");
   };
 
@@ -334,32 +379,43 @@ export default function Home() {
   }, [isAdmin, refreshProviderQuota]);
 
   const selectedType = songTypes.find((item) => item.id === order.songType) ?? songTypes[0];
+  const resolvedOccasion = resolveOccasion(order);
   const completion = useMemo(() => {
-    const required = [
-      order.recipient,
-      order.occasion,
-      order.style,
-      order.mood,
-      order.vocalist,
-      order.languageRegister,
-      order.lyricStructure,
-      order.story,
-      order.customerName,
-      order.email,
-      order.phone,
-    ];
+    const required = [order.recipient, resolveOccasion(order), order.story, order.customerName, order.email, order.phone];
     const filled = required.filter((value) => value.trim().length > 0).length;
     return Math.round((filled / required.length) * 100);
   }, [order]);
 
   // Drives both the order form's own step tabs and the marketing process
   // band above it — real state, not a fixed/decorative indicator: the
-  // form's step (0/1/2) maps directly to process steps 0/1/2, and a
-  // delivered result bumps it to the final "מקבלים את השיר" step.
+  // form's step (0/1/2/3) maps directly to the 4 marketing process steps,
+  // and a delivered result bumps it to the final "מקבלים את השיר" step.
   const activeProcessIndex = result ? 3 : step;
 
   const setField = <K extends keyof OrderPayload>(key: K, value: OrderPayload[K]) => {
     setOrder((current) => ({ ...current, [key]: value }));
+  };
+
+  const selectOccasion = (chip: string) => {
+    setOrder((current) => ({
+      ...current,
+      occasionChip: chip,
+      occasionCustom: chip === "אחר" ? current.occasionCustom : "",
+    }));
+  };
+
+  const toggleMood = (moodId: string) => {
+    setOrder((current) => {
+      if (current.moods.includes(moodId)) {
+        return { ...current, moods: current.moods.filter((mood) => mood !== moodId) };
+      }
+
+      if (current.moods.length >= MAX_MOODS) {
+        return { ...current, moods: [...current.moods.slice(1), moodId] };
+      }
+
+      return { ...current, moods: [...current.moods, moodId] };
+    });
   };
 
   const submitOrder = async (event: FormEvent<HTMLFormElement>) => {
@@ -372,11 +428,11 @@ export default function Home() {
       return;
     }
 
-    const missingField = requiredOrderFields.find(({ key }) => !order[key]?.toString().trim());
+    const missingField = getMissingFieldInfo(order);
 
     if (missingField) {
-      setStep(1);
-      setOrderError(`חסר פרט: "${missingField.label}". אפשר להשלים אותו בשלב "מספרים את הסיפור".`);
+      setStep(missingField.step);
+      setOrderError(`חסר פרט: "${missingField.label}".`);
       setStatus("error");
       return;
     }
@@ -401,7 +457,22 @@ export default function Home() {
       const response = await fetch("/api/orders", {
         method: "POST",
         headers,
-        body: JSON.stringify({ ...order, mode: orderMode, idempotencyKey }),
+        body: JSON.stringify({
+          songType: order.songType,
+          recipient: order.recipient,
+          occasion: resolveOccasion(order),
+          moods: order.moods,
+          inspiration: order.inspiration,
+          story: order.story,
+          mustInclude: order.mustInclude,
+          avoid: order.avoid,
+          customerName: order.customerName,
+          email: order.email,
+          phone: order.phone,
+          consent: order.consent,
+          mode: orderMode,
+          idempotencyKey,
+        }),
       });
 
       if (response.status === 409) {
@@ -440,7 +511,7 @@ export default function Home() {
       const data = (await response.json()) as ApiResult;
       setResult(data);
       setStatus("ready");
-      setStep(2);
+      setStep(3);
       setIdempotencyKey(crypto.randomUUID());
       void account.refreshCredits();
       void refreshProviderQuota();
@@ -598,7 +669,7 @@ export default function Home() {
 
         <form className="order-tool" onSubmit={submitOrder}>
           <div className="steps" aria-label="התקדמות ביצירת השיר">
-            {["סוג שיר", "הסיפור", "סיכום"].map((label, index) => (
+            {["סוג שיר", "הסיפור", "אימות", "סיכום"].map((label, index) => (
               <button
                 className={step === index ? "active" : ""}
                 key={label}
@@ -664,133 +735,192 @@ export default function Home() {
           )}
 
           {step === 1 && (
-            <div className="form-panel">
+            <div className="form-panel story-panel">
               <div className="panel-heading">
                 <span className="panel-icon">
                   <Edit size={18} />
                 </span>
                 <div>
-                  <h3>{selectedType.label}: מספרים את הסיפור</h3>
-                  <p>ככל שהפרטים מדויקים יותר, השיר יישמע אישי יותר.</p>
+                  <h3>למי מכינים את השיר?</h3>
+                  <p>כמה פרטים קטנים, ואנחנו כבר נהפוך אותם לשיר.</p>
+                </div>
+              </div>
+
+              <label className="story-field">
+                <span className="story-field-label">למי מכינים את השיר?</span>
+                <input
+                  required
+                  value={order.recipient}
+                  onChange={(event) => setField("recipient", event.target.value)}
+                  placeholder="לדוגמה: נועה, החברה שלי"
+                />
+              </label>
+
+              <div className="chip-field">
+                <span className="story-field-label">מה חוגגים?</span>
+                <div className="occasion-chips">
+                  {OCCASION_CHIPS.map((chip) => (
+                    <button
+                      className={order.occasionChip === chip ? "occasion-chip selected" : "occasion-chip"}
+                      key={chip}
+                      onClick={() => selectOccasion(chip)}
+                      type="button"
+                    >
+                      {chip}
+                    </button>
+                  ))}
+                </div>
+                {order.occasionChip === "אחר" && (
+                  <input
+                    className="occasion-other-input"
+                    onChange={(event) => setField("occasionCustom", event.target.value)}
+                    placeholder="איזה אירוע?"
+                    value={order.occasionCustom}
+                  />
+                )}
+              </div>
+
+              <label className="story-field story-field--main">
+                <span className="story-field-label">ספרו לנו קצת על {order.recipient.trim() || "האדם שהשיר בשבילו"}</span>
+                <textarea
+                  className="story-textarea"
+                  required
+                  value={order.story}
+                  onChange={(event) => setField("story", event.target.value)}
+                  placeholder={
+                    "איך הכרתם? מה אתם אוהבים לעשות יחד? משהו מצחיק שקרה? רגע שלא תשכחו? כינוי מיוחד? פרטים שמאפיינים אותו או אותה?\n\nלא צריך לנסח יפה, פשוט תספרו לנו. אנחנו כבר נהפוך את זה לשיר."
+                  }
+                />
+                <span className="story-field-hint">ככל שתספרו יותר, השיר ירגיש יותר אישי.</span>
+              </label>
+
+              <label className="story-field">
+                <span className="story-field-label">יש משהו שחייב להופיע בשיר?</span>
+                <input
+                  onChange={(event) => setField("mustInclude", event.target.value)}
+                  placeholder="למשל: הכינוי 'במבה', הטיול ליוון, המשפט שהוא תמיד אומר..."
+                  value={order.mustInclude}
+                />
+              </label>
+
+              <div className="chip-field">
+                <span className="story-field-label">איך אתם רוצים שהשיר ירגיש?</span>
+                <div className="mood-chips">
+                  {MOOD_CHIPS.map((mood) => (
+                    <button
+                      className={order.moods.includes(mood.id) ? "mood-chip selected" : "mood-chip"}
+                      key={mood.id}
+                      onClick={() => toggleMood(mood.id)}
+                      type="button"
+                    >
+                      <span className="mood-chip-emoji">{mood.emoji}</span>
+                      {mood.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <label className="story-field">
+                <span className="story-field-label">
+                  יש זמר או שיר שאתם אוהבים? <span className="story-field-optional">אופציונלי</span>
+                </span>
+                <input
+                  onChange={(event) => setField("inspiration", event.target.value)}
+                  placeholder="לדוגמה: עומר אדם, אושר כהן, פופ ישראלי..."
+                  value={order.inspiration}
+                />
+              </label>
+
+              <button
+                aria-expanded={advancedOpen}
+                className="advanced-options-toggle"
+                onClick={() => setAdvancedOpen((value) => !value)}
+                type="button"
+              >
+                אפשרויות נוספות
+                <ChevronDown className={advancedOpen ? "advanced-options-chevron open" : "advanced-options-chevron"} size={14} />
+              </button>
+
+              {advancedOpen && (
+                <label className="story-field advanced-options-panel">
+                  <span className="story-field-label">יש משהו שלא תרצו שיופיע בשיר?</span>
+                  <input
+                    onChange={(event) => setField("avoid", event.target.value)}
+                    placeholder="למשל: לא להזכיר גיל, לא להשתמש בשם משפחה, בלי חיקוי זמר מוכר"
+                    value={order.avoid}
+                  />
+                </label>
+              )}
+
+              <div className="form-footer">
+                <button className="ghost-button" type="button" onClick={() => setStep(0)}>
+                  חזרה
+                </button>
+                <button className="primary-button" type="button" onClick={() => setStep(2)}>
+                  המשך
+                  <ArrowLeft size={18} />
+                </button>
+              </div>
+            </div>
+          )}
+
+          {step === 2 && (
+            <div className="form-panel confirm-panel">
+              <div className="panel-heading">
+                <span className="panel-icon">
+                  <CheckCircle size={18} />
+                </span>
+                <div>
+                  <h3>רק לוודא שהבנו נכון ✨</h3>
+                  <p>ככה השיר שלכם עומד להיראות. אפשר לאשר או לחזור ולשנות.</p>
+                </div>
+              </div>
+
+              {order.story.trim().length < 15 && (
+                <p className="confirm-nudge">
+                  <AlertTriangle size={15} />
+                  רגע — ספרו לנו עוד קצת כדי שהשיר יצא מדויק יותר.
+                  <button className="confirm-nudge-link" onClick={() => setStep(1)} type="button">
+                    להוסיף פרטים
+                  </button>
+                </p>
+              )}
+
+              <div className="confirm-summary-card">
+                <p>{buildConfirmationSummary(order)}</p>
+              </div>
+
+              <div className="confirm-actions">
+                <button className="primary-button" type="button" onClick={() => setStep(3)}>
+                  כן, תכינו לי שיר 🎵
+                </button>
+                <button className="ghost-button" type="button" onClick={() => setStep(1)}>
+                  רוצה לשנות משהו
+                </button>
+              </div>
+            </div>
+          )}
+
+          {step === 3 && (
+            <div className="form-panel summary-panel">
+              <div className="panel-heading">
+                <span className="panel-icon">
+                  <CheckCircle size={18} />
+                </span>
+                <div>
+                  <h3>מאשרים ושולחים</h3>
+                  <p>עוד כמה פרטים ליצירת קשר, ואז שולחים ליצירה.</p>
                 </div>
               </div>
 
               <div className="field-grid">
                 <label>
-                  שם/מותג שעליו השיר
-                  <input
-                    required
-                    value={order.recipient}
-                    onChange={(event) => setField("recipient", event.target.value)}
-                    placeholder="לדוגמה: נועה / קפה אריאל / שכבת ו'"
-                  />
-                </label>
-                <label>
-                  אירוע או מטרה
-                  <input
-                    required
-                    value={order.occasion}
-                    onChange={(event) => setField("occasion", event.target.value)}
-                    placeholder="יום הולדת 40, ג'ינגל לפתיחה, מסיבת סיום"
-                  />
-                </label>
-                <label>
-                  סגנון מוזיקלי
-                  <select value={order.style} onChange={(event) => setField("style", event.target.value)}>
-                    {styles.map((style) => (
-                      <option key={style}>{style}</option>
-                    ))}
-                  </select>
-                </label>
-                <label>
-                  רגש מוביל
-                  <select value={order.mood} onChange={(event) => setField("mood", event.target.value)}>
-                    {moods.map((mood) => (
-                      <option key={mood}>{mood}</option>
-                    ))}
-                  </select>
-                </label>
-                <label>
-                  מי שר
-                  <select value={order.vocalist} onChange={(event) => setField("vocalist", event.target.value)}>
-                    {vocalists.map((voice) => (
-                      <option key={voice}>{voice}</option>
-                    ))}
-                  </select>
-                </label>
-                <label>
-                  סוג העברית
-                  <select
-                    value={order.languageRegister}
-                    onChange={(event) => setField("languageRegister", event.target.value)}
-                  >
-                    {languageRegisters.map((register) => (
-                      <option key={register}>{register}</option>
-                    ))}
-                  </select>
-                </label>
-                <label>
-                  מבנה מילים
-                  <select
-                    value={order.lyricStructure}
-                    onChange={(event) => setField("lyricStructure", event.target.value)}
-                  >
-                    {lyricStructures.map((structure) => (
-                      <option key={structure}>{structure}</option>
-                    ))}
-                  </select>
-                </label>
-                <label>
-                  שם הלקוח
+                  שם מלא
                   <input
                     required
                     value={order.customerName}
                     onChange={(event) => setField("customerName", event.target.value)}
                     placeholder="השם שלך"
-                  />
-                </label>
-                <label className="wide">
-                  הגייה לשירה
-                  <input
-                    value={order.pronunciation}
-                    onChange={(event) => setField("pronunciation", event.target.value)}
-                    placeholder="למשל: סקי שייר (לשם באנגלית)"
-                  />
-                </label>
-                <label className="wide">
-                  הסיפור
-                  <textarea
-                    required
-                    value={order.story}
-                    onChange={(event) => setField("story", event.target.value)}
-                    placeholder="ספרו בכמה משפטים על האדם, העסק או הכיתה. רגעים מצחיקים, מילים חשובות, או מסר שצריך להישאר."
-                  />
-                </label>
-                <label className="wide">
-                  מה חייב להיכנס?
-                  <textarea
-                    value={order.mustInclude}
-                    onChange={(event) => setField("mustInclude", event.target.value)}
-                    placeholder="שמות, סלוגן, מקומות, הגייה נכונה, משפטים פנימיים"
-                  />
-                </label>
-                <label className="wide">
-                  מה לא להזכיר?
-                  <input
-                    value={order.avoid}
-                    onChange={(event) => setField("avoid", event.target.value)}
-                    placeholder="למשל: לא להזכיר גיל, לא להשתמש בשם משפחה, בלי חיקוי זמר מוכר"
-                  />
-                </label>
-                <label>
-                  אימייל
-                  <input
-                    dir="ltr"
-                    required
-                    type="email"
-                    value={order.email}
-                    onChange={(event) => setField("email", event.target.value)}
-                    placeholder="name@example.com"
                   />
                 </label>
                 <label>
@@ -804,39 +934,27 @@ export default function Home() {
                     placeholder="050-0000000"
                   />
                 </label>
+                <label className="wide">
+                  אימייל
+                  <input
+                    dir="ltr"
+                    required
+                    type="email"
+                    value={order.email}
+                    onChange={(event) => setField("email", event.target.value)}
+                    placeholder="name@example.com"
+                  />
+                </label>
               </div>
 
-              <div className="form-footer">
-                <button className="ghost-button" type="button" onClick={() => setStep(0)}>
-                  חזרה
-                </button>
-                <button className="primary-button" type="button" onClick={() => setStep(2)}>
-                  לסיכום ההזמנה
-                  <ArrowLeft size={18} />
-                </button>
-              </div>
-            </div>
-          )}
-
-          {step === 2 && (
-            <div className="form-panel summary-panel">
-              <div className="panel-heading">
-                <span className="panel-icon">
-                  <CheckCircle size={18} />
-                </span>
-                <div>
-                  <h3>מאשרים ושולחים</h3>
-                  <p>עוברים על הפרטים, מאשרים את תנאי השימוש, ושולחים ליצירה.</p>
-                </div>
-              </div>
               <div className="summary-grid">
                 <div>
                   <span>סוג השיר</span>
                   <strong>{selectedType.label}</strong>
                 </div>
                 <div>
-                  <span>סגנון</span>
-                  <strong>{order.style}</strong>
+                  <span>האירוע</span>
+                  <strong>{resolvedOccasion || "—"}</strong>
                 </div>
                 <div>
                   <span>מה מקבלים</span>
@@ -940,7 +1058,7 @@ export default function Home() {
                             setOrderMode("full");
                             setResult(null);
                             setStatus("idle");
-                            setStep(2);
+                            setStep(3);
                           }}
                           type="button"
                         >

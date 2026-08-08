@@ -4,9 +4,19 @@ import { getUserFromRequest } from "@/lib/auth-user";
 import { isAdminUser } from "@/lib/is-admin";
 import { CREDITS_PER_SONG, FREE_DEMO, MAX_VERSION_SECONDS } from "@/lib/pricing-catalog";
 import { createServerClient } from "@/lib/supabase-server";
-import { createSongVersion, GeneratedVersion, MusicProviderError, OrderContent, text, uploadSongAudio } from "@/lib/song-generation";
+import {
+  createSongVersion,
+  GeneratedVersion,
+  inferSongAttributes,
+  MusicProviderError,
+  OrderContent,
+  text,
+  uploadSongAudio,
+} from "@/lib/song-generation";
 
 type OrderPayload = OrderContent & {
+  moods?: string[];
+  inspiration?: string;
   customerName?: string;
   email?: string;
   phone?: string;
@@ -23,19 +33,12 @@ type OrderResponse = {
   refunded?: boolean;
 };
 
-const requiredFields: Array<keyof OrderPayload> = [
-  "recipient",
-  "occasion",
-  "style",
-  "mood",
-  "vocalist",
-  "languageRegister",
-  "lyricStructure",
-  "story",
-  "customerName",
-  "email",
-  "phone",
-];
+// style/mood/vocalist/languageRegister/lyricStructure are no longer
+// client-supplied — the customer only picks an occasion chip + up to 2
+// mood chips and writes the story; inferSongAttributes() derives the rest
+// (see lib/song-generation.ts) so the generation pipeline itself doesn't
+// need to change.
+const requiredFields: Array<keyof OrderPayload> = ["recipient", "occasion", "story", "customerName", "email", "phone"];
 
 function orderInsertRow(
   orderId: string,
@@ -93,6 +96,17 @@ export async function POST(request: NextRequest) {
   const supabase = createServerClient();
   const mode: "demo" | "full" = order.mode === "demo" ? "demo" : "full";
 
+  // The customer only gave us an occasion + up to 2 mood chips + free text —
+  // fill in the style/mood/vocalist/language/structure attributes the
+  // existing lyric-writing and ElevenLabs pipeline expects.
+  const inferred = inferSongAttributes({
+    songType: order.songType,
+    occasion: order.occasion,
+    moods: order.moods,
+    inspiration: order.inspiration,
+  });
+  const enrichedOrder: OrderPayload = { ...order, ...inferred };
+
   try {
     if (mode === "demo") {
       if (!admin) {
@@ -110,7 +124,7 @@ export async function POST(request: NextRequest) {
         }
       }
 
-      const version = await createSongVersion(order, FREE_DEMO.seconds, "דמו");
+      const version = await createSongVersion(enrichedOrder, FREE_DEMO.seconds, "דמו");
       const response: OrderResponse = {
         orderId: `demo_${Date.now()}`,
         mode: "demo",
@@ -159,8 +173,8 @@ export async function POST(request: NextRequest) {
     const versions: GeneratedVersion[] = [];
 
     try {
-      versions.push(await createSongVersion(order, MAX_VERSION_SECONDS, "א"));
-      versions.push(await createSongVersion(order, MAX_VERSION_SECONDS, "ב"));
+      versions.push(await createSongVersion(enrichedOrder, MAX_VERSION_SECONDS, "א"));
+      versions.push(await createSongVersion(enrichedOrder, MAX_VERSION_SECONDS, "ב"));
     } catch (generationError) {
       if (!admin) {
         await supabase.rpc("grant_credits", {
@@ -194,7 +208,9 @@ export async function POST(request: NextRequest) {
     const promptPreview = versions[0]?.promptPreview || "";
     const { error: insertError } = await supabase
       .from("orders")
-      .insert(orderInsertRow(orderId, user.id, order, "full", promptPreview, MAX_VERSION_SECONDS, admin ? 0 : CREDITS_PER_SONG));
+      .insert(
+        orderInsertRow(orderId, user.id, enrichedOrder, "full", promptPreview, MAX_VERSION_SECONDS, admin ? 0 : CREDITS_PER_SONG),
+      );
 
     if (insertError) {
       console.error("Failed to persist order:", insertError.message);

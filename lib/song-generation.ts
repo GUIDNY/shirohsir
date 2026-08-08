@@ -74,6 +74,8 @@ const vocalistDirections: Record<string, string> = {
   "קולות קבוצה": "small group vocals in the chorus, singalong feeling, clear lead vocal in verses",
   "קול צעיר ונקי": "young clean vocal, bright and friendly, suitable for school or birthday",
   "קול בוגר ומכובד": "mature respectful vocal, calm and confident, suitable for family or business",
+  "קול חם המתאים לרגע":
+    "warm, natural, contemporary Israeli vocal tone — gender and character chosen to fit the emotional context, not specified by the customer",
 };
 
 const languageDirections: Record<string, string> = {
@@ -163,6 +165,18 @@ function occasionHook(order: OrderContent) {
     return "זה השם שנשאר";
   }
 
+  if (/משפחה/i.test(occasion)) {
+    return "המשפחה שלנו ביחד";
+  }
+
+  if (/חבר/i.test(occasion)) {
+    return "החברות הזאת שווה הכל";
+  }
+
+  if (/פרידה/i.test(occasion)) {
+    return "הדרך ממשיכה מכאן";
+  }
+
   return line(occasion, "הרגע הזה");
 }
 
@@ -178,6 +192,105 @@ function mustIncludeLine(order: OrderContent) {
   }
 
   return line(include);
+}
+
+// ---- heuristic inference (replaces the old style/mood/vocalist/language/
+// structure dropdowns) ----------------------------------------------------
+//
+// The customer only picks an occasion chip + up to 2 "how should it feel"
+// mood chips, and tells the story in free text. Everything below turns
+// those into the same five internal attributes buildHebrewLyrics() and
+// createSongVersion() already know how to use — so the generation pipeline
+// itself is unchanged, only where its inputs come from.
+
+export type StoryInput = {
+  songType?: string;
+  occasion?: string;
+  moods?: string[];
+  inspiration?: string;
+};
+
+export type InferredAttributes = {
+  style: string;
+  mood: string;
+  vocalist: string;
+  languageRegister: string;
+  lyricStructure: string;
+};
+
+const MOOD_CHIP_DIRECTIONS: Record<string, string> = {
+  מרגש: "moving and sincere, warm emotional delivery",
+  מצחיק: "playful, witty, light-hearted, fun energy",
+  רומנטי: "romantic, tender, intimate love-song feeling",
+  שמח: "happy, upbeat, celebratory energy",
+  קצבי: "rhythmic, danceable, driving groove",
+};
+
+function combineMoodDirection(moods: string[] | undefined): string {
+  const picked = (moods ?? []).filter((mood) => MOOD_CHIP_DIRECTIONS[mood]);
+
+  if (picked.length === 0) {
+    return moodDirections["מרגש אבל לא כבד"];
+  }
+
+  return picked.map((mood) => MOOD_CHIP_DIRECTIONS[mood]).join(", combined with ");
+}
+
+function inferStyle(occasion: string, moods: string[], songType: string | undefined): string {
+  if (songType === "business") {
+    return "ג'ינגל קצר לעסק";
+  }
+
+  if (/חתונה|אהבה|זוגיות/.test(occasion) || moods.includes("רומנטי")) {
+    return "ים תיכוני עדין ומכובד";
+  }
+
+  if (/פרידה/.test(occasion)) {
+    return "בלדה ישראלית מרגשת";
+  }
+
+  if (/משפחה/.test(occasion)) {
+    return "אקוסטי חם ומשפחתי";
+  }
+
+  if (moods.includes("קצבי")) {
+    return "היפ הופ ישראלי קליל";
+  }
+
+  return "פופ ישראלי עכשווי ונקי";
+}
+
+function inferLanguageRegister(occasion: string): string {
+  if (/חתונה|עסק/.test(occasion)) {
+    return "עברית חגיגית ונקייה";
+  }
+
+  return "עברית ישראלית מדוברת";
+}
+
+function inferLyricStructure(occasion: string, songType: string | undefined): string {
+  if (songType === "graduation" || /פרידה|חבר/.test(occasion)) {
+    return "ברכה אישית מרגשת";
+  }
+
+  if (/עסק/.test(occasion) && songType !== "business") {
+    return "פזמון פתיחה ישר לעניין";
+  }
+
+  return "בית קצר ופזמון קליט";
+}
+
+export function inferSongAttributes(input: StoryInput): InferredAttributes {
+  const occasion = text(input.occasion);
+  const moods = input.moods ?? [];
+
+  return {
+    style: inferStyle(occasion, moods, input.songType),
+    mood: combineMoodDirection(moods),
+    vocalist: "קול חם המתאים לרגע",
+    languageRegister: inferLanguageRegister(occasion),
+    lyricStructure: inferLyricStructure(occasion, input.songType),
+  };
 }
 
 export function buildHebrewLyrics(order: OrderContent) {
