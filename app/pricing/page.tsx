@@ -5,6 +5,7 @@ import Link from "next/link";
 import { BillingModal } from "../BillingModal";
 import { PricingSection, PricingTab } from "../PricingSection";
 import { promptSignIn } from "../promptSignIn";
+import { SiteFooter } from "../SiteFooter";
 import { SiteHeader } from "../SiteHeader";
 import { useAccount } from "../useAccount";
 import { PricingPlan } from "@/lib/pricing-catalog";
@@ -66,6 +67,8 @@ export default function PricingPage() {
       <div className="pricing-page-body">
         <PricingSection onSelectPlan={handleSelectPlan} onTabChange={setTab} tab={tab} />
       </div>
+
+      <SiteFooter />
 
       {checkoutPlan && (
         <BillingModal

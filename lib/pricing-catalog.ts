@@ -57,7 +57,7 @@ export const singleSongPlan: PricingPlan = {
   isSubscription: false,
   isActive: true,
   displayOrder: 1,
-  buttonText: "יצירת שיר ב-39 ₪",
+  buttonText: "רכישת 10 קרדיטים — 39 ₪",
   smallPrint: "כולל 10 קרדיטים ליצירת שיר מלא",
   sufficientForText: "שיר מלא אחד",
   features: [

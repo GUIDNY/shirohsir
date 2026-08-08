@@ -25,6 +25,7 @@ import {
 } from "./icons";
 import { BillingModal } from "./BillingModal";
 import { promptSignIn } from "./promptSignIn";
+import { SiteFooter } from "./SiteFooter";
 import { SiteHeader } from "./SiteHeader";
 import { CREDITS_PER_SONG, PricingPlan, singleSongPlan } from "@/lib/pricing-catalog";
 import { useAccount } from "./useAccount";
@@ -199,7 +200,7 @@ const processSteps = [
   { title: "בוחרים סוג שיר", detail: "יום הולדת, חתונה, זוגיות, עסק או כל אירוע אחר." },
   { title: "מספרים את הסיפור", detail: "מוסיפים שמות, זיכרונות, בדיחות ורגעים מיוחדים." },
   { title: "מאשרים את המילים", detail: "עוברים על מה שהבנו ומאשרים לפני ההפקה." },
-  { title: "מקבלים את השיר", detail: "מורידים את הגרסאות המוכנות ומשתפים עם מי שאוהבים." },
+  { title: "מורידים את השיר", detail: "הגרסאות המוכנות זמינות באזור האישי להורדה ולשיתוף." },
 ];
 
 const allowedRules = [
@@ -389,7 +390,7 @@ export default function Home() {
   // Drives both the order form's own step tabs and the marketing process
   // band above it — real state, not a fixed/decorative indicator: the
   // form's step (0/1/2/3) maps directly to the 4 marketing process steps,
-  // and a delivered result bumps it to the final "מקבלים את השיר" step.
+  // and a delivered result bumps it to the final "מורידים את השיר" step.
   const activeProcessIndex = result ? 3 : step;
 
   const setField = <K extends keyof OrderPayload>(key: K, value: OrderPayload[K]) => {
@@ -562,8 +563,8 @@ export default function Home() {
           </p>
           <h1>הופכים את הסיפור שלכם לשיר אישי.</h1>
           <p className="hero-text">
-            ספרו לנו על האדם, האירוע והרגעים החשובים. אנחנו נכתוב, נלחין ונפיק עבורכם שיר מקורי ומרגש,
-            מוכן לשיתוף ולהורדה.
+            ספרו למערכת על האדם, האירוע והרגעים החשובים. המערכת כותבת, מלחינה ומפיקה שיר מקורי אוטומטית
+            תוך דקות, מוכן לשיתוף ולהורדה.
           </p>
           <div className="hero-actions">
             <a className="primary-link" href="#order">
@@ -576,7 +577,9 @@ export default function Home() {
           </div>
           <dl className="trust-strip" aria-label="למה לבחור בנו">
             <div>
-              <dt>שיר אישי ב-{singleSongPlan.priceIls} ₪</dt>
+              <dt>
+                {CREDITS_PER_SONG} קרדיטים — {singleSongPlan.priceIls} ₪
+              </dt>
               <dd>מחיר קבוע וברור, ומאזינים לדמו חינם לפני שמשלמים.</dd>
             </div>
             <div>
@@ -612,13 +615,14 @@ export default function Home() {
             </span>
             <div>
               <strong>טיוטת מילים לאישור</strong>
-              <span>נשלחת אליכם לפני שהשיר מופק</span>
+              <span>מוצגת באזור האישי לפני ההפקה</span>
             </div>
           </div>
         </div>
       </section>
 
       <section id="how" className="process-band" aria-label="איך זה עובד">
+        <p className="process-band-caption">התהליך אוטומטי לחלוטין — מרגע ההזמנה ועד ההורדה, ללא מגע אנושי.</p>
         <div className="process-band-inner">
           {processSteps.map((item, index) => {
             const state =
@@ -742,7 +746,7 @@ export default function Home() {
                 </span>
                 <div>
                   <h3>למי מכינים את השיר?</h3>
-                  <p>כמה פרטים קטנים, ואנחנו כבר נהפוך אותם לשיר.</p>
+                  <p>כמה פרטים קטנים, והמערכת כבר תהפוך אותם לשיר.</p>
                 </div>
               </div>
 
@@ -788,7 +792,7 @@ export default function Home() {
                   value={order.story}
                   onChange={(event) => setField("story", event.target.value)}
                   placeholder={
-                    "איך הכרתם? מה אתם אוהבים לעשות יחד? משהו מצחיק שקרה? רגע שלא תשכחו? כינוי מיוחד? פרטים שמאפיינים אותו או אותה?\n\nלא צריך לנסח יפה, פשוט תספרו לנו. אנחנו כבר נהפוך את זה לשיר."
+                    "איך הכרתם? מה אתם אוהבים לעשות יחד? משהו מצחיק שקרה? רגע שלא תשכחו? כינוי מיוחד? פרטים שמאפיינים אותו או אותה?\n\nלא צריך לנסח יפה, פשוט תספרו לנו. המערכת כבר תהפוך את זה לשיר."
                   }
                 />
                 <span className="story-field-hint">ככל שתספרו יותר, השיר ירגיש יותר אישי.</span>
@@ -1235,6 +1239,8 @@ export default function Home() {
           </Link>
         </div>
       </section>
+
+      <SiteFooter />
 
       <a className="scroll-top-fab" href="#top" aria-label="חזרה לראש העמוד">
         <ArrowUp size={20} />
