@@ -13,6 +13,9 @@ export function proxy(request: NextRequest) {
   }
 }
 
+// Excludes /api/* — the old-domain redirect only matters for page
+// visits; running it in front of API routes risks interfering with
+// request handling (POST bodies, etc.) for no benefit.
 export const config = {
-  matcher: "/((?!_next/static|_next/image|favicon.ico).*)",
+  matcher: "/((?!api|_next/static|_next/image|favicon.ico).*)",
 };
