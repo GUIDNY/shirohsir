@@ -4,10 +4,22 @@ import { MusicNote } from "../icons";
 import { SiteFooter } from "../SiteFooter";
 import { creditPacks, CREDITS_PER_SONG, singleSongPlan, subscriptionPlans } from "@/lib/pricing-catalog";
 
+const title = "Personal Melody — AI-Generated Personal Songs in Hebrew";
+const description =
+  "A fully automated SaaS app that turns your story into a personal Hebrew song — no human involvement, credit-based pricing.";
+
 export const metadata: Metadata = {
-  title: "Personal Melody — AI-Generated Personal Songs in Hebrew",
-  description:
-    "A fully automated SaaS app that turns your story into a personal Hebrew song — no human involvement, credit-based pricing.",
+  title,
+  description,
+  alternates: {
+    canonical: "/en",
+  },
+  openGraph: {
+    title,
+    description,
+    url: "/en",
+    images: ["/og.png"],
+  },
 };
 
 const STEPS = [
@@ -67,6 +79,7 @@ export default function EnglishPage() {
             </div>
           ))}
         </div>
+        <p className="en-steps-credit">Songs are generated using ElevenLabs Music technology.</p>
       </section>
 
       <section className="en-pricing">

@@ -1,10 +1,23 @@
 import type { Metadata } from "next";
 import { LegalPageShell } from "../LegalPageShell";
 import { CREDITS_PER_SONG } from "@/lib/pricing-catalog";
+import { SUPPORT_EMAIL } from "@/lib/site-config";
+
+const title = "תנאי שימוש | מנגינה אישית";
+const description = "תנאי השימוש באפליקציית מנגינה אישית — מערכת SaaS מבוססת קרדיטים ליצירת שירים אישיים אוטומטית.";
 
 export const metadata: Metadata = {
-  title: "תנאי שימוש | מנגינה אישית",
-  description: "תנאי השימוש באפליקציית מנגינה אישית — מערכת SaaS מבוססת קרדיטים ליצירת שירים אישיים אוטומטית.",
+  title,
+  description,
+  alternates: {
+    canonical: "/terms",
+  },
+  openGraph: {
+    title,
+    description,
+    url: "/terms",
+    images: ["/og.png"],
+  },
 };
 
 const LAST_UPDATED = "2026-08-08";
@@ -76,7 +89,7 @@ export default function TermsPage() {
 
           <h2>8. Contact</h2>
           <p>
-            For questions about these Terms, contact us at <a href="mailto:bd12123@gmail.com">bd12123@gmail.com</a>.
+            For questions about these Terms, contact us at <a href={`mailto:${SUPPORT_EMAIL}`}>{SUPPORT_EMAIL}</a>.
           </p>
         </>
       }
@@ -135,7 +148,7 @@ export default function TermsPage() {
 
       <h2>8. יצירת קשר</h2>
       <p>
-        לשאלות בנוגע לתנאים אלה, ניתן לפנות אלינו ב-<a href="mailto:bd12123@gmail.com">bd12123@gmail.com</a>.
+        לשאלות בנוגע לתנאים אלה, ניתן לפנות אלינו ב-<a href={`mailto:${SUPPORT_EMAIL}`}>{SUPPORT_EMAIL}</a>.
       </p>
     </LegalPageShell>
   );

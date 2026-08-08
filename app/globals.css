@@ -1239,6 +1239,16 @@ h3 {
   text-align: center;
 }
 
+.process-band-credit {
+  width: min(1180px, calc(100% - 32px));
+  margin: 0 auto;
+  padding: 6px 0 0;
+  color: var(--brown-800);
+  font-size: 0.82rem;
+  font-weight: 600;
+  text-align: center;
+}
+
 .process-band-inner {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
@@ -3504,6 +3514,14 @@ textarea:focus {
   line-height: 1.5;
 }
 
+.en-steps-credit {
+  margin: 18px 0 0;
+  color: var(--brown-800);
+  font-size: 0.86rem;
+  font-weight: 600;
+  text-align: center;
+}
+
 .en-pricing-note {
   max-width: 640px;
   margin: 0 auto 28px;
@@ -3631,6 +3649,15 @@ textarea:focus {
   font-weight: 700;
 }
 
+.site-footer-credit {
+  width: min(1180px, calc(100% - 32px));
+  margin: 0 auto;
+  padding: 0 0 20px;
+  color: var(--brown-800);
+  font-size: 0.86rem;
+  font-weight: 600;
+}
+
 @media (max-width: 640px) {
   .site-footer-inner {
     flex-direction: column;
@@ -3641,6 +3668,10 @@ textarea:focus {
 
   .site-footer-links {
     justify-content: center;
+  }
+
+  .site-footer-credit {
+    text-align: center;
   }
 }
 

@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Heebo } from "next/font/google";
 import { singleSongPlan } from "@/lib/pricing-catalog";
+import { SITE_URL } from "@/lib/site-config";
 import "./globals.css";
 
 const heebo = Heebo({
@@ -12,19 +13,22 @@ const heebo = Heebo({
 
 const siteTitle = "מנגינה אישית | יצירת שיר AI בעברית";
 const siteDescription = `הופכים את הסיפור שלכם לשיר אישי בעברית — מערכת אוטומטית שכותבת, מלחינה ומפיקה שיר מוכן להורדה ולשיתוף במחיר של ${singleSongPlan.priceIls} ₪.`;
-const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000";
 
 export const metadata: Metadata = {
-  metadataBase: new URL(siteUrl),
+  metadataBase: new URL(SITE_URL),
   title: siteTitle,
   description: siteDescription,
   icons: {
     icon: "/favicon.svg",
     shortcut: "/favicon.svg",
   },
+  alternates: {
+    canonical: "/",
+  },
   openGraph: {
     title: siteTitle,
     description: siteDescription,
+    url: "/",
     locale: "he_IL",
     type: "website",
     images: [

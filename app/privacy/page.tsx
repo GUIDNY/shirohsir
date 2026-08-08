@@ -1,9 +1,22 @@
 import type { Metadata } from "next";
 import { LegalPageShell } from "../LegalPageShell";
+import { SUPPORT_EMAIL } from "@/lib/site-config";
+
+const title = "מדיניות פרטיות | מנגינה אישית";
+const description = "אילו נתונים אוספת מנגינה אישית, מי מעבד אותם, וכיצד לבקש גישה, תיקון או מחיקה.";
 
 export const metadata: Metadata = {
-  title: "מדיניות פרטיות | מנגינה אישית",
-  description: "אילו נתונים אוספת מנגינה אישית, מי מעבד אותם, וכיצד לבקש גישה, תיקון או מחיקה.",
+  title,
+  description,
+  alternates: {
+    canonical: "/privacy",
+  },
+  openGraph: {
+    title,
+    description,
+    url: "/privacy",
+    images: ["/og.png"],
+  },
 };
 
 const LAST_UPDATED = "2026-08-08";
@@ -54,7 +67,7 @@ export default function PrivacyPage() {
           <h2>5. Your Rights</h2>
           <p>
             You may request access to, correction of, or deletion of your data (subject to the retention
-            requirement above) by contacting <a href="mailto:bd12123@gmail.com">bd12123@gmail.com</a>.
+            requirement above) by contacting <a href={`mailto:${SUPPORT_EMAIL}`}>{SUPPORT_EMAIL}</a>.
           </p>
 
           <h2>6. Cookies</h2>
@@ -64,7 +77,7 @@ export default function PrivacyPage() {
           </p>
 
           <h2>7. Contact</h2>
-          <p><a href="mailto:bd12123@gmail.com">bd12123@gmail.com</a></p>
+          <p><a href={`mailto:${SUPPORT_EMAIL}`}>{SUPPORT_EMAIL}</a></p>
         </>
       }
     >
@@ -102,7 +115,7 @@ export default function PrivacyPage() {
       <h2>5. הזכויות שלך</h2>
       <p>
         באפשרותך לבקש גישה למידע שלך, תיקון שלו, או מחיקתו (בכפוף למגבלת שמירת החוק כאמור לעיל), על ידי פנייה
-        ל-<a href="mailto:bd12123@gmail.com">bd12123@gmail.com</a>.
+        ל-<a href={`mailto:${SUPPORT_EMAIL}`}>{SUPPORT_EMAIL}</a>.
       </p>
 
       <h2>6. עוגיות (Cookies)</h2>
@@ -112,7 +125,7 @@ export default function PrivacyPage() {
       </p>
 
       <h2>7. יצירת קשר</h2>
-      <p><a href="mailto:bd12123@gmail.com">bd12123@gmail.com</a></p>
+      <p><a href={`mailto:${SUPPORT_EMAIL}`}>{SUPPORT_EMAIL}</a></p>
     </LegalPageShell>
   );
 }

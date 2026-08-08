@@ -1,9 +1,22 @@
 import type { Metadata } from "next";
 import { LegalPageShell } from "../LegalPageShell";
+import { SUPPORT_EMAIL } from "@/lib/site-config";
+
+const title = "מדיניות החזרים | מנגינה אישית";
+const description = "מתי אפשר לקבל החזר על קרדיטים, ומה קורה במקרה של תקלה טכנית או ביטול מנוי.";
 
 export const metadata: Metadata = {
-  title: "מדיניות החזרים | מנגינה אישית",
-  description: "מתי אפשר לקבל החזר על קרדיטים, ומה קורה במקרה של תקלה טכנית או ביטול מנוי.",
+  title,
+  description,
+  alternates: {
+    canonical: "/refund-policy",
+  },
+  openGraph: {
+    title,
+    description,
+    url: "/refund-policy",
+    images: ["/og.png"],
+  },
 };
 
 const LAST_UPDATED = "2026-08-08";
@@ -20,7 +33,7 @@ export default function RefundPolicyPage() {
           <h2>1. Unused Credits</h2>
           <p>
             You may request a full refund for purchased credits that have not been used, within 14 days of
-            purchase, by contacting <a href="mailto:bd12123@gmail.com">bd12123@gmail.com</a>.
+            purchase, by contacting <a href={`mailto:${SUPPORT_EMAIL}`}>{SUPPORT_EMAIL}</a>.
           </p>
 
           <h2>2. Used Credits</h2>
@@ -45,7 +58,7 @@ export default function RefundPolicyPage() {
           <h2>5. Before a Chargeback</h2>
           <p>
             We&apos;re happy to resolve any issue directly — please contact us at{" "}
-            <a href="mailto:bd12123@gmail.com">bd12123@gmail.com</a> before initiating a chargeback with your card
+            <a href={`mailto:${SUPPORT_EMAIL}`}>{SUPPORT_EMAIL}</a> before initiating a chargeback with your card
             issuer.
           </p>
 
@@ -62,7 +75,7 @@ export default function RefundPolicyPage() {
       <h2>1. קרדיטים שלא נוצלו</h2>
       <p>
         ניתן לבקש החזר מלא על קרדיטים שנרכשו ולא נוצלו, בתוך 14 יום ממועד הרכישה, על ידי פנייה
-        ל-<a href="mailto:bd12123@gmail.com">bd12123@gmail.com</a>.
+        ל-<a href={`mailto:${SUPPORT_EMAIL}`}>{SUPPORT_EMAIL}</a>.
       </p>
 
       <h2>2. קרדיטים שנוצלו</h2>
@@ -80,7 +93,7 @@ export default function RefundPolicyPage() {
       <h2>5. לפני חיוב חוזר (Chargeback)</h2>
       <p>
         נשמח לפתור כל בעיה ישירות — לפני פתיחת חיוב חוזר מול חברת האשראי, מומלץ ליצור קשר איתנו
-        ב-<a href="mailto:bd12123@gmail.com">bd12123@gmail.com</a>.
+        ב-<a href={`mailto:${SUPPORT_EMAIL}`}>{SUPPORT_EMAIL}</a>.
       </p>
 
       <h2>6. עיבוד ההחזר</h2>

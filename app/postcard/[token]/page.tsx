@@ -47,11 +47,21 @@ export async function generateMetadata({
   }
 
   const title = `שיר בשביל ${postcard.recipient} | מנגינה אישית`;
+  const description = `גלויה מוזיקלית ל${postcard.recipient} — ${postcard.occasion}`;
+  const url = `/postcard/${token}`;
 
   return {
     title,
-    description: `גלויה מוזיקלית ל${postcard.recipient} — ${postcard.occasion}`,
-    openGraph: postcard.photo_url ? { images: [{ url: postcard.photo_url }] } : undefined,
+    description,
+    alternates: {
+      canonical: url,
+    },
+    openGraph: {
+      title,
+      description,
+      url,
+      images: postcard.photo_url ? [{ url: postcard.photo_url }] : [{ url: "/og.png" }],
+    },
   };
 }
 

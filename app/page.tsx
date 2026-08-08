@@ -623,6 +623,9 @@ export default function Home() {
 
       <section id="how" className="process-band" aria-label="איך זה עובד">
         <p className="process-band-caption">התהליך אוטומטי לחלוטין — מרגע ההזמנה ועד ההורדה, ללא מגע אנושי.</p>
+        <p className="process-band-credit">
+          השירים מופקים באמצעות <span dir="ltr">ElevenLabs Music</span>.
+        </p>
         <div className="process-band-inner">
           {processSteps.map((item, index) => {
             const state =

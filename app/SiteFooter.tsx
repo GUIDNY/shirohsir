@@ -1,7 +1,6 @@
 import Link from "next/link";
 import { MusicNote } from "./icons";
-
-const SUPPORT_EMAIL = "bd12123@gmail.com";
+import { SUPPORT_EMAIL } from "@/lib/site-config";
 
 // Plain component (no hooks, no "use client") so it can drop into both
 // client pages (page.tsx, /pricing) and plain server pages (/terms,
@@ -29,6 +28,10 @@ export function SiteFooter() {
         <a className="site-footer-contact" href={`mailto:${SUPPORT_EMAIL}`}>
           {SUPPORT_EMAIL}
         </a>
+      </div>
+
+      <div className="site-footer-credit" dir="ltr">
+        Powered by ElevenLabs Music
       </div>
     </footer>
   );
