@@ -1429,17 +1429,7 @@ export default function Home() {
         <ArrowUp size={20} />
       </a>
 
-      {checkoutPlan && (
-        <BillingModal
-          account={account}
-          plan={checkoutPlan}
-          onClose={() => setCheckoutPlan(null)}
-          onSuccess={() => {
-            setCheckoutPlan(null);
-            goToSection("order");
-          }}
-        />
-      )}
+      {checkoutPlan && <BillingModal account={account} plan={checkoutPlan} onClose={() => setCheckoutPlan(null)} />}
     </main>
   );
 }

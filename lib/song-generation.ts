@@ -455,6 +455,75 @@ function cleanApiKey(value: string | undefined) {
   return withoutWrappingQuotes.replace(/[^\x20-\x7e]/g, "");
 }
 
+function elevenLabsApiKey() {
+  return cleanApiKey(
+    process.env.ELEVENLABS_API_KEY ||
+      process.env.ELEVEN_API_KEY ||
+      process.env.EVEANLABS_API_KEY ||
+      process.env.API_KEY ||
+      process.env.XI_API_KEY,
+  );
+}
+
+export type ElevenLabsSubscription = {
+  tier?: string;
+  character_count?: number;
+  character_limit?: number;
+  max_credit_limit_extension?: number | "unlimited";
+  can_extend_character_limit?: boolean;
+  current_overage?: { amount_cents?: number; currency?: string };
+  status?: string;
+  has_open_invoices?: boolean;
+  next_character_count_reset_unix?: number | null;
+  currency?: string | null;
+  billing_period?: string | null;
+};
+
+export type ElevenLabsQuota =
+  | { ok: true; subscription: ElevenLabsSubscription; remaining: number; limit: number }
+  | { ok: false; reason: "missing_api_key" | "provider_error"; providerStatus?: number; detail?: string };
+
+// Shared by the admin quota panel (/api/credits) and the pre-generation
+// check in /api/orders — one fetch of ElevenLabs' account-wide quota;
+// each caller reads whatever fields it needs from `subscription`.
+// "remaining"/"limit" are in ElevenLabs' own character-based unit (the
+// same figure the account dashboard shows) — we don't have a verified
+// characters-per-second conversion for Music generation, so the
+// pre-generation check only guards against the account being fully
+// exhausted (remaining <= 0) rather than pretending to size each
+// request precisely.
+export async function fetchElevenLabsQuota(): Promise<ElevenLabsQuota> {
+  const apiKey = elevenLabsApiKey();
+
+  if (!apiKey) {
+    return { ok: false, reason: "missing_api_key" };
+  }
+
+  const providerResponse = await fetch("https://api.elevenlabs.io/v1/user/subscription", {
+    headers: {
+      "Content-Type": "application/json",
+      "xi-api-key": apiKey,
+    },
+    cache: "no-store",
+  });
+
+  if (!providerResponse.ok) {
+    const providerMessage = await providerResponse.text();
+    return {
+      ok: false,
+      reason: "provider_error",
+      providerStatus: providerResponse.status,
+      detail: providerMessage.slice(0, 300),
+    };
+  }
+
+  const subscription = (await providerResponse.json()) as ElevenLabsSubscription;
+  const used = typeof subscription.character_count === "number" ? subscription.character_count : 0;
+  const limit = typeof subscription.character_limit === "number" ? subscription.character_limit : 0;
+
+  return { ok: true, subscription, remaining: Math.max(limit - used, 0), limit };
+}
+
 function arrayBufferToBase64(buffer: ArrayBuffer) {
   const bytes = new Uint8Array(buffer);
   const chunkSize = 0x8000;
@@ -479,13 +548,7 @@ function safeFileName(value: string) {
 }
 
 export async function createSongVersion(order: OrderContent, songSeconds: number, versionLabel: string): Promise<GeneratedVersion> {
-  const apiKey = cleanApiKey(
-    process.env.ELEVENLABS_API_KEY ||
-      process.env.ELEVEN_API_KEY ||
-      process.env.EVEANLABS_API_KEY ||
-      process.env.API_KEY ||
-      process.env.XI_API_KEY,
-  );
+  const apiKey = elevenLabsApiKey();
   const outputFormat = process.env.ELEVENLABS_OUTPUT_FORMAT || "mp3_44100_128";
   const apiUrl =
     process.env.ELEVENLABS_MUSIC_API_URL ||

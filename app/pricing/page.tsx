@@ -70,17 +70,7 @@ export default function PricingPage() {
 
       <SiteFooter />
 
-      {checkoutPlan && (
-        <BillingModal
-          account={account}
-          plan={checkoutPlan}
-          onClose={() => setCheckoutPlan(null)}
-          onSuccess={() => {
-            setCheckoutPlan(null);
-            window.location.href = "/#order";
-          }}
-        />
-      )}
+      {checkoutPlan && <BillingModal account={account} plan={checkoutPlan} onClose={() => setCheckoutPlan(null)} />}
     </main>
   );
 }

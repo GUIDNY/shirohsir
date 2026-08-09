@@ -1,36 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getUserFromRequest } from "@/lib/auth-user";
 import { isAdminUser } from "@/lib/is-admin";
+import { fetchElevenLabsQuota } from "@/lib/song-generation";
 
 export const dynamic = "force-dynamic";
-
-type SubscriptionResponse = {
-  tier?: string;
-  character_count?: number;
-  character_limit?: number;
-  max_credit_limit_extension?: number | "unlimited";
-  can_extend_character_limit?: boolean;
-  current_overage?: {
-    amount_cents?: number;
-    currency?: string;
-  };
-  status?: string;
-  has_open_invoices?: boolean;
-  next_character_count_reset_unix?: number | null;
-  currency?: string | null;
-  billing_period?: string | null;
-};
-
-function cleanApiKey(value: string | undefined) {
-  if (!value) {
-    return "";
-  }
-
-  const withoutEnvName = value.replace(/^\s*(?:ELEVENLABS_API_KEY|ELEVEN_API_KEY|EVEANLABS_API_KEY|API_KEY|XI_API_KEY)\s*=\s*/i, "");
-  const withoutWrappingQuotes = withoutEnvName.trim().replace(/^["']|["']$/g, "");
-
-  return withoutWrappingQuotes.replace(/[^\x20-\x7e]/g, "");
-}
 
 function safeNumber(value: unknown) {
   return typeof value === "number" && Number.isFinite(value) ? value : 0;
@@ -43,15 +16,9 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: "מנהל בלבד" }, { status: 403 });
   }
 
-  const apiKey = cleanApiKey(
-    process.env.ELEVENLABS_API_KEY ||
-      process.env.ELEVEN_API_KEY ||
-      process.env.EVEANLABS_API_KEY ||
-      process.env.API_KEY ||
-      process.env.XI_API_KEY,
-  );
+  const quota = await fetchElevenLabsQuota();
 
-  if (!apiKey) {
+  if (!quota.ok && quota.reason === "missing_api_key") {
     return NextResponse.json(
       {
         mode: "demo",
@@ -62,23 +29,13 @@ export async function GET(request: NextRequest) {
     );
   }
 
-  const providerResponse = await fetch("https://api.elevenlabs.io/v1/user/subscription", {
-    headers: {
-      "Content-Type": "application/json",
-      "xi-api-key": apiKey,
-    },
-    cache: "no-store",
-  });
-
-  if (!providerResponse.ok) {
-    const providerMessage = await providerResponse.text();
-
+  if (!quota.ok) {
     return NextResponse.json(
       {
         mode: "live",
         status: "provider_error",
-        providerStatus: providerResponse.status,
-        providerMessage: providerMessage.slice(0, 300),
+        providerStatus: quota.providerStatus,
+        providerMessage: quota.detail,
         updatedAt: new Date().toISOString(),
       },
       {
@@ -88,10 +45,8 @@ export async function GET(request: NextRequest) {
     );
   }
 
-  const subscription = (await providerResponse.json()) as SubscriptionResponse;
+  const { subscription, remaining, limit } = quota;
   const used = safeNumber(subscription.character_count);
-  const limit = safeNumber(subscription.character_limit);
-  const remaining = Math.max(limit - used, 0);
   const percentUsed = limit > 0 ? Math.min(Math.round((used / limit) * 100), 100) : 0;
   const nextReset = subscription.next_character_count_reset_unix
     ? new Date(subscription.next_character_count_reset_unix * 1000).toISOString()

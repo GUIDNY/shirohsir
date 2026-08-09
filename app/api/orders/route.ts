@@ -6,6 +6,7 @@ import { CREDITS_PER_SONG, FREE_DEMO, MAX_VERSION_SECONDS, SONG_LENGTH_OPTIONS }
 import { createServerClient } from "@/lib/supabase-server";
 import {
   createSongVersion,
+  fetchElevenLabsQuota,
   GeneratedVersion,
   inferSongAttributes,
   MusicProviderError,
@@ -164,6 +165,26 @@ export async function POST(request: NextRequest) {
     const songSeconds = SONG_LENGTH_OPTIONS.some((option) => option.seconds === order.songLengthSeconds)
       ? (order.songLengthSeconds as number)
       : MAX_VERSION_SECONDS;
+
+    // Check the music provider isn't already exhausted BEFORE spending the
+    // customer's own credits — a customer who pays and then hits a
+    // provider-side failure is exactly the chargeback scenario we want to
+    // avoid. A missing key or a provider error here is unusual enough (and
+    // this check isn't itself billed) that we let generation proceed and
+    // surface the real failure from createSongVersion() instead of
+    // blocking on an inconclusive quota check.
+    const quota = await fetchElevenLabsQuota();
+
+    if (quota.ok && quota.remaining <= 0) {
+      console.error(
+        `[ELEVENLABS_LOW_BALANCE] Blocked order attempt — remaining=${quota.remaining} limit=${quota.limit} user=${user.id}`,
+      );
+
+      return NextResponse.json(
+        { error: "תקלה זמנית בצד הספק — לא חויבתם, אפשר לנסות שוב בעוד כמה דקות", code: "provider_exhausted" },
+        { status: 503 },
+      );
+    }
 
     if (!admin) {
       const { error: spendError } = await supabase.rpc("spend_credits", {

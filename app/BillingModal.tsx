@@ -1,69 +1,43 @@
 "use client";
 
 import { useState } from "react";
+import { buildCheckoutUrl } from "@/lib/lemonsqueezy-catalog";
 import { PricingPlan } from "@/lib/pricing-catalog";
-import { CheckSmall, Loader, Lock } from "./icons";
+import { CheckSmall, Lock } from "./icons";
 import { useAccount } from "./useAccount";
 
-// Confirm-and-pay step for a single plan already chosen on the pricing
-// section — the tabs/cards live there, this modal only handles the
-// "תהליך רכישה" checkout steps (summary, total, one-time vs. subscription
-// notice, pay, success). Real payment isn't connected yet, so "pay" is
-// the same disclosed demo-checkout pattern used elsewhere on the site —
-// credits are granted only after this call succeeds, never before.
+// Confirm step for a plan already chosen on the pricing section — the
+// tabs/cards live there, this modal only shows the summary before
+// sending the customer to Lemon Squeezy's real hosted checkout. Credits
+// are granted only once the webhook confirms payment
+// (app/api/webhooks/lemonsqueezy/route.ts) — never here, and never
+// before Lemon Squeezy has actually charged the card.
 export function BillingModal({
   account,
   plan,
   onClose,
-  onSuccess,
 }: {
   account: ReturnType<typeof useAccount>;
   plan: PricingPlan;
   onClose: () => void;
-  onSuccess: () => void;
 }) {
-  const [idempotencyKey] = useState(() => crypto.randomUUID());
-  const [pending, setPending] = useState(false);
-  const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  const runPurchase = async () => {
-    const accessToken = account.session?.access_token;
+  const goToCheckout = () => {
+    const user = account.session?.user;
 
-    if (!accessToken) {
+    if (!user) {
       return;
     }
 
-    setPending(true);
-    setMessage(null);
-    setError(null);
+    const checkoutUrl = buildCheckoutUrl(plan.id, { id: user.id, email: user.email });
 
-    try {
-      const endpoint = plan.isSubscription ? "/api/billing/subscribe" : "/api/billing/purchase";
-      const response = await fetch(endpoint, {
-        method: "POST",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${accessToken}` },
-        body: JSON.stringify({ productId: plan.id, idempotencyKey }),
-      });
-      const data = await response.json();
-
-      if (!response.ok) {
-        setError(data.error || "משהו השתבש, אפשר לנסות שוב.");
-        return;
-      }
-
-      setMessage(
-        plan.isSubscription
-          ? "ברוכים הבאים למועדון! הקרדיטים החודשיים נוספו לחשבון שלך."
-          : "הרכישה הושלמה בהצלחה והקרדיטים נוספו לחשבון שלך.",
-      );
-      void account.refreshCredits();
-      window.setTimeout(() => onSuccess(), 1400);
-    } catch {
-      setError("משהו השתבש, אפשר לנסות שוב.");
-    } finally {
-      setPending(false);
+    if (!checkoutUrl) {
+      setError("המסלול הזה לא זמין כרגע לרכישה — נא לפנות אלינו.");
+      return;
     }
+
+    window.location.href = checkoutUrl;
   };
 
   return (
@@ -109,14 +83,11 @@ export function BillingModal({
           ))}
         </ul>
 
-        <p className="billing-demo-note">מצב הדגמה — לא מתבצע חיוב אמיתי בכרטיס אשראי. סליקה אמיתית תתחבר בהמשך.</p>
-
         {error && <p className="billing-error">{error}</p>}
-        {message && <p className="billing-success">{message}</p>}
 
-        <button className="checkout-pay-button" disabled={pending || !!message} onClick={() => void runPurchase()} type="button">
-          {pending ? <Loader size={18} /> : <Lock size={18} />}
-          {pending ? "מעבדים את התשלום..." : plan.buttonText}
+        <button className="checkout-pay-button" onClick={goToCheckout} type="button">
+          <Lock size={18} />
+          {plan.buttonText}
         </button>
       </div>
     </div>
