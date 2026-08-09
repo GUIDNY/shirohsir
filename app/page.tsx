@@ -676,17 +676,28 @@ export default function Home() {
         </div>
 
         <div className="studio-visual" aria-label="תצוגת שיר">
-          <div className="record-sleeve">
-            <div className="vinyl-stage">
-              <span className="vinyl-ring" aria-hidden="true" />
-              <span className="vinyl-ring vinyl-ring--outer" aria-hidden="true" />
-              <div className="vinyl-disc">
-                <span className="tone-arm" aria-hidden="true" />
-                <div className="disc-label">
-                  <span className="spindle-hole" />
-                  <strong className="cover-title">השיר של נועה</strong>
-                  <span className="cover-subtitle">פופ ישראלי</span>
-                </div>
+          <div className="player-card">
+            <div className="player-card-top">
+              <span className="player-card-brand font-wordmark" dir="ltr">
+                My Shirli
+              </span>
+              <span className="player-card-badge">PREMIUM</span>
+            </div>
+
+            <div className="waveform" aria-hidden="true">
+              {Array.from({ length: 28 }).map((_, index) => (
+                <span className="waveform-bar" key={index} style={{ "--i": index } as React.CSSProperties} />
+              ))}
+            </div>
+
+            <button className="player-card-play" type="button" aria-label="נגן דוגמת שיר">
+              <PlayCircle size={26} strokeWidth={1.6} />
+            </button>
+
+            <div className="player-card-bottom">
+              <div>
+                <strong className="cover-title">השיר של נועה</strong>
+                <span className="cover-subtitle">פופ ישראלי</span>
               </div>
             </div>
           </div>

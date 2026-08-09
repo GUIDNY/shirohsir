@@ -184,17 +184,13 @@ a {
   }
 }
 
-@keyframes vinyl-spin {
-  to {
-    transform: rotate(360deg);
-  }
-}
-
-@keyframes ping {
-  75%,
+@keyframes waveform-bounce {
+  0%,
   100% {
-    opacity: 0;
-    transform: scale(1.4);
+    height: 18%;
+  }
+  50% {
+    height: 85%;
   }
 }
 
@@ -1184,110 +1180,110 @@ h3 {
   align-self: stretch;
 }
 
-.record-sleeve {
+.player-card {
   position: relative;
   display: flex;
   flex-direction: column;
-  gap: 24px;
+  justify-content: space-between;
+  gap: 20px;
   min-height: 400px;
-  padding: 30px;
-  border: 1px solid var(--cream-200);
+  padding: 28px;
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, 0.08);
   border-radius: var(--radius-lg);
-  background: linear-gradient(150deg, var(--cream-50), var(--cream-100));
+  background:
+    radial-gradient(circle at 28% 15%, rgba(208, 188, 255, 0.28), transparent 60%),
+    radial-gradient(circle at 80% 85%, rgba(255, 176, 205, 0.18), transparent 55%),
+    linear-gradient(160deg, #1a1224, #0b0810 75%);
   box-shadow: var(--shadow-elegant);
 }
 
-.vinyl-stage {
-  position: relative;
-  display: grid;
-  flex: 1;
-  place-items: center;
-}
-
-.vinyl-ring {
-  position: absolute;
-  width: 78%;
-  height: 78%;
-  border: 1px solid rgba(140, 44, 67, 0.22);
-  border-radius: 50%;
-  animation: ping 3s cubic-bezier(0, 0, 0.2, 1) infinite;
-}
-
-.vinyl-ring--outer {
-  width: 92%;
-  height: 92%;
-  animation-delay: 0.4s;
-}
-
-.vinyl-disc {
+.player-card-top {
   position: relative;
   z-index: 1;
-  display: grid;
-  width: clamp(220px, 30vw, 300px);
-  aspect-ratio: 1;
-  place-items: center;
-  border: 2px solid rgba(0, 0, 0, 0.15);
-  border-radius: 50%;
-  background:
-    repeating-radial-gradient(circle, rgba(255, 255, 255, 0.06) 0, rgba(255, 255, 255, 0.06) 2px, transparent 2px, transparent 4px),
-    radial-gradient(circle, #262626, #101010 72%);
-  box-shadow: var(--shadow-vinyl);
-  animation: vinyl-spin 9s linear infinite;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
 }
 
-.tone-arm {
+.player-card-brand {
+  color: #f4eeff;
+  font-size: 0.92rem;
+  font-weight: 700;
+}
+
+.player-card-badge {
+  padding: 4px 10px;
+  border: 1px solid rgba(208, 188, 255, 0.4);
+  border-radius: 999px;
+  color: #d0bcff;
+  font-size: 0.64rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+}
+
+.waveform {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex: 1;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  min-height: 120px;
+}
+
+.waveform-bar {
+  width: 5px;
+  height: 18%;
+  border-radius: 999px;
+  background: linear-gradient(180deg, #d0bcff, #ff9ad6);
+  animation: waveform-bounce 1.6s ease-in-out infinite;
+  animation-delay: calc(var(--i) * 0.07s);
+}
+
+.player-card-play {
   position: absolute;
-  top: -14%;
-  right: -14%;
+  top: 50%;
+  left: 50%;
   z-index: 2;
-  width: 18%;
-  height: 62%;
-  border-bottom: 4px solid var(--brown-800);
-  border-inline-start: 4px solid var(--brown-800);
-  border-radius: 0 0 0 60px;
-  opacity: 0;
-  transition: opacity 0.5s ease;
-}
-
-.record-sleeve:hover .tone-arm {
-  opacity: 0.9;
-}
-
-.disc-label {
   display: grid;
-  gap: 3px;
-  width: 42%;
-  aspect-ratio: 1;
-  padding: clamp(6px, 3.4vw, 12px);
-  border: 3px solid rgba(0, 0, 0, 0.3);
+  width: 64px;
+  height: 64px;
+  padding: 0;
+  border: 1px solid rgba(255, 255, 255, 0.25);
   border-radius: 50%;
-  background: linear-gradient(145deg, var(--burgundy-600), var(--burgundy-900));
-  color: var(--cream-50);
-  place-content: center;
-  text-align: center;
-  overflow: hidden;
+  background: rgba(20, 14, 28, 0.55);
+  backdrop-filter: blur(6px);
+  color: #f4eeff;
+  cursor: pointer;
+  place-items: center;
+  transform: translate(-50%, -50%);
+  transition: transform 0.2s ease;
 }
 
-.spindle-hole {
-  justify-self: center;
-  width: 10px;
-  height: 10px;
-  margin-bottom: 4px;
-  border-radius: 50%;
-  background: var(--cream-50);
-  box-shadow: inset 0 0 0 2px rgba(0, 0, 0, 0.3);
+.player-card-play:hover {
+  transform: translate(-50%, -50%) scale(1.06);
+}
+
+.player-card-bottom {
+  position: relative;
+  z-index: 1;
+  color: #f4eeff;
 }
 
 .cover-title {
-  font-size: clamp(0.78rem, 1.6vw, 0.92rem);
+  display: block;
+  font-size: clamp(0.85rem, 1.6vw, 0.98rem);
   font-weight: 800;
   letter-spacing: -0.01em;
 }
 
 .cover-subtitle {
-  font-size: 0.68rem;
+  display: block;
+  color: rgba(244, 238, 255, 0.7);
+  font-size: 0.7rem;
   letter-spacing: 0.06em;
-  opacity: 0.85;
   text-transform: uppercase;
 }
 
