@@ -54,6 +54,7 @@ type OrderPayload = {
   phone: string;
   consent: boolean;
   songLengthSeconds: number;
+  recipientGender: "male" | "female" | null;
 };
 
 type SongVersion = {
@@ -131,6 +132,7 @@ const initialOrder: OrderPayload = {
   phone: "",
   consent: false,
   songLengthSeconds: DEFAULT_SONG_LENGTH_SECONDS,
+  recipientGender: null,
 };
 
 const OCCASION_CHIPS = ["יום הולדת", "חתונה", "זוגיות", "משפחה", "חבר/ה", "פרידה", "עסק", "אחר"];
@@ -156,6 +158,10 @@ function resolveOccasion(order: OrderPayload) {
 function getMissingFieldInfo(order: OrderPayload): { label: string; step: number } | null {
   if (!order.recipient.trim()) {
     return { label: "למי מכינים את השיר", step: 1 };
+  }
+
+  if (!order.recipientGender) {
+    return { label: "האם מדובר בגבר או באישה", step: 1 };
   }
 
   if (!order.occasionChip) {
@@ -297,6 +303,8 @@ export default function Home() {
   const [checkoutPlan, setCheckoutPlan] = useState<PricingPlan | null>(null);
   const [providerQuota, setProviderQuota] = useState<ProviderQuotaInfo | null>(null);
   const [providerQuotaStatus, setProviderQuotaStatus] = useState<"loading" | "ready" | "error">("loading");
+  const [lyricsPreview, setLyricsPreview] = useState<string | null>(null);
+  const [lyricsPreviewError, setLyricsPreviewError] = useState(false);
   const isAdmin = account.credits?.isAdmin === true;
   const isLiveProviderQuota = providerQuotaStatus === "ready" && providerQuota?.mode === "live";
   const accessToken = account.session?.access_token;
@@ -389,6 +397,70 @@ export default function Home() {
 
   const selectedType = songTypes.find((item) => item.id === order.songType) ?? songTypes[0];
   const resolvedOccasion = resolveOccasion(order);
+  const canPreviewLyrics = Boolean(
+    order.recipient.trim() && resolvedOccasion && order.story.trim() && order.recipientGender,
+  );
+
+  // Fetch the real generated lyrics (not just a summary sentence) whenever
+  // the customer reaches the confirm step, so they can catch a mistake
+  // before the paid step actually spends credits and calls ElevenLabs.
+  // buildHebrewLyrics() is a pure template function, so this preview
+  // always matches what the real order will produce for the same inputs.
+  useEffect(() => {
+    if (step !== 2 || !accessToken || !canPreviewLyrics) {
+      return;
+    }
+
+    let cancelled = false;
+
+    fetch("/api/orders/preview-lyrics", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${accessToken}`,
+      },
+      body: JSON.stringify({
+        songType: order.songType,
+        recipient: order.recipient,
+        occasion: resolvedOccasion,
+        moods: order.moods,
+        inspiration: order.inspiration,
+        story: order.story,
+        mustInclude: order.mustInclude,
+        avoid: order.avoid,
+        recipientGender: order.recipientGender,
+      }),
+    })
+      .then((response) => (response.ok ? response.json() : Promise.reject(response)))
+      .then((data: { lyrics: string }) => {
+        if (!cancelled) {
+          setLyricsPreview(data.lyrics);
+          setLyricsPreviewError(false);
+        }
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setLyricsPreviewError(true);
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [
+    step,
+    accessToken,
+    canPreviewLyrics,
+    order.songType,
+    order.recipient,
+    resolvedOccasion,
+    order.moods,
+    order.inspiration,
+    order.story,
+    order.mustInclude,
+    order.avoid,
+    order.recipientGender,
+  ]);
   const completion = useMemo(() => {
     const required = [order.recipient, resolveOccasion(order), order.story, order.customerName, order.email, order.phone];
     const filled = required.filter((value) => value.trim().length > 0).length;
@@ -482,6 +554,7 @@ export default function Home() {
           mode: orderMode,
           idempotencyKey,
           songLengthSeconds: order.songLengthSeconds,
+          recipientGender: order.recipientGender,
         }),
       });
 
@@ -795,6 +868,27 @@ export default function Home() {
               </label>
 
               <div className="chip-field">
+                <span className="story-field-label">{order.recipient.trim() || "מי שהשיר בשבילו"} זה...</span>
+                <div className="occasion-chips">
+                  <button
+                    className={order.recipientGender === "male" ? "occasion-chip selected" : "occasion-chip"}
+                    onClick={() => setField("recipientGender", "male")}
+                    type="button"
+                  >
+                    הוא
+                  </button>
+                  <button
+                    className={order.recipientGender === "female" ? "occasion-chip selected" : "occasion-chip"}
+                    onClick={() => setField("recipientGender", "female")}
+                    type="button"
+                  >
+                    היא
+                  </button>
+                </div>
+                <span className="story-field-hint">כדי שהמילים בשיר יתאימו נכון מבחינה דקדוקית.</span>
+              </div>
+
+              <div className="chip-field">
                 <span className="story-field-label">מה חוגגים?</span>
                 <div className="occasion-chips">
                   {OCCASION_CHIPS.map((chip) => (
@@ -927,6 +1021,36 @@ export default function Home() {
               <div className="confirm-summary-card">
                 <p>{buildConfirmationSummary(order)}</p>
               </div>
+
+              {canPreviewLyrics && (
+                <div className="lyrics-draft-preview">
+                  <span className="story-field-label">כך יראו מילות השיר</span>
+
+                  {!lyricsPreview && !lyricsPreviewError && (
+                    <p className="lyrics-draft-preview-status">טוענים את המילים...</p>
+                  )}
+
+                  {lyricsPreviewError && !lyricsPreview && (
+                    <p className="lyrics-draft-preview-status">
+                      לא הצלחנו לטעון תצוגה מקדימה של המילים כרגע — אפשר להמשיך בכל זאת.
+                    </p>
+                  )}
+
+                  {lyricsPreview && (
+                    <div className="lyrics-draft-preview-card">
+                      {lyricsPreview.split("\n").map((line, index) =>
+                        /^\[[^\]]+\]$/.test(line.trim()) ? (
+                          <span className="lyrics-draft-preview-tag" key={index}>
+                            {line.trim().replace(/[[\]]/g, "")}
+                          </span>
+                        ) : (
+                          <p key={index}>{line}</p>
+                        ),
+                      )}
+                    </div>
+                  )}
+                </div>
+              )}
 
               <div className="confirm-actions">
                 <button className="primary-button" type="button" onClick={() => setStep(3)}>

@@ -17,6 +17,7 @@ export type OrderContent = {
   story?: string;
   mustInclude?: string;
   avoid?: string;
+  recipientGender?: "male" | "female";
 };
 
 export type GeneratedVersion = {
@@ -110,13 +111,17 @@ function storyLyricLine(order: OrderContent) {
   const story = text(order.story);
   const occasion = text(order.occasion);
   const source = `${story} ${occasion}`;
+  const isFemale = order.recipientGender === "female";
 
   if (/סקי|שלג|גולש|גולשים|חורף|עונה/i.test(source)) {
     return "השלג כבר קורא, וכולם מוכנים";
   }
 
   if (/משפחה|חברים|חברות|אוהב|אוהבת|אהבה/i.test(source)) {
-    return "עם כל האנשים שאוהבים אותך";
+    // "אותך" (you, object form) is spelled identically for both genders —
+    // niqqud alone can't disambiguate it, so this uses the "עליך/עלייך"
+    // preposition family instead, which does differ in spelling.
+    return isFemale ? "כל האהבה הזאת מרחפת עלייך" : "כל האהבה הזאת מרחפת עליך";
   }
 
   if (/עסק|מותג|לקוח|לקוחות|קמפיין|פרסום|משרד|משרדים/i.test(source)) {
@@ -293,11 +298,20 @@ export function inferSongAttributes(input: StoryInput): InferredAttributes {
   };
 }
 
+// Every 2nd-person reference below uses the "עליך/עלייך"-family of
+// prepositions (which differ in spelling by gender — an extra י for
+// feminine) instead of plain ־ך-suffixed forms like לך/איתך/שלך/אותך,
+// which are spelled identically for both genders and can't be fixed
+// by niqqud alone (see order.recipientGender — there's no reliable way
+// for the downstream Nakdan diacritization call to guess gender from
+// an ambiguous consonant spelling, so the disambiguation has to happen
+// here, in the template text itself).
 export function buildHebrewLyrics(order: OrderContent) {
   const subject = subjectForLyrics(order);
   const hook = occasionHook(order);
   const detail = storyLyricLine(order);
   const include = mustIncludeLine(order);
+  const isFemale = order.recipientGender === "female";
 
   if (order.songType === "business") {
     return [
@@ -327,7 +341,7 @@ export function buildHebrewLyrics(order: OrderContent) {
     return [
       "[Chorus]",
       `${hook} ${subject}`,
-      include || "הלב שלנו שר אליך",
+      include || (isFemale ? "הלב שלנו שר אלייך" : "הלב שלנו שר אליך"),
       "[Verse]",
       `${detail}`,
       "[Chorus]",
@@ -338,23 +352,23 @@ export function buildHebrewLyrics(order: OrderContent) {
   if (order.lyricStructure === "ברכה אישית מרגשת") {
     return [
       "[Verse]",
-      `${subject}, היום חושבים עליך`,
+      isFemale ? `${subject}, היום חושבים עלייך` : `${subject}, היום חושבים עליך`,
       `${detail}`,
       "[Chorus]",
-      include || "שיהיה לך אור בכל הדרך",
+      include || (isFemale ? "שיאיר עלייך אור בכל הדרך" : "שיאיר עליך אור בכל הדרך"),
       `${hook} מכל הלב`,
-      "אנחנו כאן איתך",
+      isFemale ? "השיר הזה שר אלייך" : "השיר הזה שר אליך",
     ].join("\n");
   }
 
   return [
     "[Verse]",
-    `${subject}, היום הזה כולו שלך`,
+    isFemale ? `${subject}, היום הזה זורח עלייך` : `${subject}, היום הזה זורח עליך`,
     `${detail}`,
     "[Chorus]",
     include || `${hook}, שרים מכל הלב`,
     "רגע קטן הופך לשיר",
-    `${subject}, האור שלך נשאר איתנו`,
+    isFemale ? `${subject}, תמיד תזכרי את היום הזה` : `${subject}, תמיד תזכור את היום הזה`,
   ].join("\n");
 }
 
@@ -411,7 +425,7 @@ async function addNiqqudToLine(line: string): Promise<string> {
   }
 }
 
-async function addNiqqud(lyrics: string): Promise<string> {
+export async function addNiqqud(lyrics: string): Promise<string> {
   const lines = lyrics.split("\n");
   const vocalized = await Promise.all(lines.map((line) => addNiqqudToLine(line)));
 

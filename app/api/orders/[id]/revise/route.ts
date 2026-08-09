@@ -35,7 +35,7 @@ export async function POST(request: NextRequest, ctx: RouteContext<"/api/orders/
   const { data: order } = await supabase
     .from("orders")
     .select(
-      "id, user_id, song_type, recipient, occasion, style, mood, vocalist, language_register, lyric_structure, pronunciation, story, must_include, avoid, song_length_seconds",
+      "id, user_id, song_type, recipient, occasion, style, mood, vocalist, language_register, lyric_structure, pronunciation, story, must_include, avoid, song_length_seconds, recipient_gender",
     )
     .eq("id", orderId)
     .maybeSingle();
@@ -66,6 +66,7 @@ export async function POST(request: NextRequest, ctx: RouteContext<"/api/orders/
     }
   }
 
+  const recipientGender: "male" | "female" = order.recipient_gender === "female" ? "female" : "male";
   const orderContent = {
     songType: order.song_type,
     recipient: order.recipient,
@@ -79,6 +80,7 @@ export async function POST(request: NextRequest, ctx: RouteContext<"/api/orders/
     story: body?.story !== undefined ? text(body.story) : order.story,
     mustInclude: body?.mustInclude !== undefined ? text(body.mustInclude) : order.must_include,
     avoid: body?.avoid !== undefined ? text(body.avoid) : order.avoid,
+    recipientGender,
   };
 
   try {

@@ -39,7 +39,15 @@ type OrderResponse = {
 // mood chips and writes the story; inferSongAttributes() derives the rest
 // (see lib/song-generation.ts) so the generation pipeline itself doesn't
 // need to change.
-const requiredFields: Array<keyof OrderPayload> = ["recipient", "occasion", "story", "customerName", "email", "phone"];
+const requiredFields: Array<keyof OrderPayload> = [
+  "recipient",
+  "occasion",
+  "story",
+  "customerName",
+  "email",
+  "phone",
+  "recipientGender",
+];
 
 function orderInsertRow(
   orderId: string,
@@ -73,6 +81,7 @@ function orderInsertRow(
     prompt_preview: promptPreview,
     song_length_seconds: songSeconds,
     credits_cost: creditsCost,
+    recipient_gender: order.recipientGender === "female" ? "female" : "male",
   };
 }
 
@@ -106,7 +115,11 @@ export async function POST(request: NextRequest) {
     moods: order.moods,
     inspiration: order.inspiration,
   });
-  const enrichedOrder: OrderPayload = { ...order, ...inferred };
+  const enrichedOrder: OrderPayload = {
+    ...order,
+    ...inferred,
+    recipientGender: order.recipientGender === "female" ? "female" : "male",
+  };
 
   try {
     if (mode === "demo") {

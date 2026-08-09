@@ -1768,6 +1768,46 @@ h3 {
   line-height: 1.8;
 }
 
+.lyrics-draft-preview {
+  display: grid;
+  gap: 10px;
+}
+
+.lyrics-draft-preview-status {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+
+.lyrics-draft-preview-card {
+  display: grid;
+  gap: 4px;
+  padding: 20px 22px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-card);
+  background: var(--cream-50);
+}
+
+.lyrics-draft-preview-card p {
+  margin: 0;
+  color: var(--brown-900);
+  font-size: 0.98rem;
+  line-height: 1.7;
+}
+
+.lyrics-draft-preview-tag {
+  margin-top: 8px;
+  color: var(--burgundy-700);
+  font-weight: 700;
+  font-size: 0.78rem;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+}
+
+.lyrics-draft-preview-tag:first-child {
+  margin-top: 0;
+}
+
 .confirm-actions {
   display: flex;
   flex-wrap: wrap;
