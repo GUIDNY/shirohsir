@@ -1544,7 +1544,7 @@ h3 {
 
 .length-grid {
   display: grid;
-  grid-template-columns: repeat(5, minmax(0, 1fr));
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 10px;
 }
 
@@ -1588,12 +1588,6 @@ h3 {
   border-color: var(--burgundy-600);
   border-width: 2px;
   background: var(--gold-soft);
-}
-
-@media (max-width: 640px) {
-  .length-grid {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-  }
 }
 
 /* ---- simplified story step (step 1) ---- */

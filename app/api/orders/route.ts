@@ -2,7 +2,7 @@ import { randomUUID } from "node:crypto";
 import { NextRequest, NextResponse } from "next/server";
 import { getUserFromRequest } from "@/lib/auth-user";
 import { isAdminUser } from "@/lib/is-admin";
-import { CREDITS_PER_SONG, FREE_DEMO, MAX_VERSION_SECONDS } from "@/lib/pricing-catalog";
+import { CREDITS_PER_SONG, FREE_DEMO, MAX_VERSION_SECONDS, SONG_LENGTH_OPTIONS } from "@/lib/pricing-catalog";
 import { createServerClient } from "@/lib/supabase-server";
 import {
   createSongVersion,
@@ -23,6 +23,7 @@ type OrderPayload = OrderContent & {
   consent?: boolean;
   mode?: "demo" | "full";
   idempotencyKey?: string;
+  songLengthSeconds?: number;
 };
 
 type OrderResponse = {
@@ -147,6 +148,9 @@ export async function POST(request: NextRequest) {
     }
 
     const orderId = randomUUID();
+    const songSeconds = SONG_LENGTH_OPTIONS.some((option) => option.seconds === order.songLengthSeconds)
+      ? (order.songLengthSeconds as number)
+      : MAX_VERSION_SECONDS;
 
     if (!admin) {
       const { error: spendError } = await supabase.rpc("spend_credits", {
@@ -173,8 +177,8 @@ export async function POST(request: NextRequest) {
     const versions: GeneratedVersion[] = [];
 
     try {
-      versions.push(await createSongVersion(enrichedOrder, MAX_VERSION_SECONDS, "א"));
-      versions.push(await createSongVersion(enrichedOrder, MAX_VERSION_SECONDS, "ב"));
+      versions.push(await createSongVersion(enrichedOrder, songSeconds, "א"));
+      versions.push(await createSongVersion(enrichedOrder, songSeconds, "ב"));
     } catch (generationError) {
       if (!admin) {
         await supabase.rpc("grant_credits", {
@@ -209,7 +213,7 @@ export async function POST(request: NextRequest) {
     const { error: insertError } = await supabase
       .from("orders")
       .insert(
-        orderInsertRow(orderId, user.id, enrichedOrder, "full", promptPreview, MAX_VERSION_SECONDS, admin ? 0 : CREDITS_PER_SONG),
+        orderInsertRow(orderId, user.id, enrichedOrder, "full", promptPreview, songSeconds, admin ? 0 : CREDITS_PER_SONG),
       );
 
     if (insertError) {

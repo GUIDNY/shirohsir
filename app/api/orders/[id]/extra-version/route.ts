@@ -27,7 +27,7 @@ export async function POST(request: NextRequest, ctx: RouteContext<"/api/orders/
   const { data: order } = await supabase
     .from("orders")
     .select(
-      "id, user_id, song_type, recipient, occasion, style, mood, vocalist, language_register, lyric_structure, pronunciation, story, must_include, avoid",
+      "id, user_id, song_type, recipient, occasion, style, mood, vocalist, language_register, lyric_structure, pronunciation, story, must_include, avoid, song_length_seconds",
     )
     .eq("id", orderId)
     .maybeSingle();
@@ -81,7 +81,7 @@ export async function POST(request: NextRequest, ctx: RouteContext<"/api/orders/
   };
 
   try {
-    const version = await createSongVersion(orderContent, MAX_VERSION_SECONDS, label);
+    const version = await createSongVersion(orderContent, order.song_length_seconds ?? MAX_VERSION_SECONDS, label);
     const audioPath =
       version.audioDataUrl && version.audioContentType
         ? await uploadSongAudio(supabase, user.id, orderId, label, version.audioDataUrl, version.audioContentType)

@@ -27,7 +27,13 @@ import { BillingModal } from "./BillingModal";
 import { promptSignIn } from "./promptSignIn";
 import { SiteFooter } from "./SiteFooter";
 import { SiteHeader } from "./SiteHeader";
-import { CREDITS_PER_SONG, PricingPlan, singleSongPlan } from "@/lib/pricing-catalog";
+import {
+  CREDITS_PER_SONG,
+  DEFAULT_SONG_LENGTH_SECONDS,
+  PricingPlan,
+  singleSongPlan,
+  SONG_LENGTH_OPTIONS,
+} from "@/lib/pricing-catalog";
 import { useAccount } from "./useAccount";
 
 type SongType = "gift" | "business" | "graduation";
@@ -47,6 +53,7 @@ type OrderPayload = {
   email: string;
   phone: string;
   consent: boolean;
+  songLengthSeconds: number;
 };
 
 type SongVersion = {
@@ -123,6 +130,7 @@ const initialOrder: OrderPayload = {
   email: "",
   phone: "",
   consent: false,
+  songLengthSeconds: DEFAULT_SONG_LENGTH_SECONDS,
 };
 
 const OCCASION_CHIPS = ["יום הולדת", "חתונה", "זוגיות", "משפחה", "חבר/ה", "פרידה", "עסק", "אחר"];
@@ -473,6 +481,7 @@ export default function Home() {
           consent: order.consent,
           mode: orderMode,
           idempotencyKey,
+          songLengthSeconds: order.songLengthSeconds,
         }),
       });
 
@@ -727,6 +736,28 @@ export default function Home() {
                 ))}
               </div>
 
+              {orderMode === "full" && (
+                <div className="length-picker">
+                  <span className="length-picker-label">משך השיר</span>
+                  <div className="length-grid">
+                    {SONG_LENGTH_OPTIONS.map((option) => (
+                      <label
+                        className={order.songLengthSeconds === option.seconds ? "length-card selected" : "length-card"}
+                        key={option.seconds}
+                      >
+                        <input
+                          checked={order.songLengthSeconds === option.seconds}
+                          name="songLengthSeconds"
+                          onChange={() => setField("songLengthSeconds", option.seconds)}
+                          type="radio"
+                        />
+                        <strong>{option.label}</strong>
+                      </label>
+                    ))}
+                  </div>
+                </div>
+              )}
+
               {orderMode === "demo" && (
                 <p className="demo-mode-note">
                   <PlayCircle size={15} />
@@ -967,6 +998,14 @@ export default function Home() {
                   <span>מה מקבלים</span>
                   <strong>{orderMode === "demo" ? "דמו להאזנה באתר" : "שתי גרסאות"}</strong>
                 </div>
+                {orderMode === "full" && (
+                  <div>
+                    <span>משך השיר</span>
+                    <strong>
+                      {SONG_LENGTH_OPTIONS.find((option) => option.seconds === order.songLengthSeconds)?.label}
+                    </strong>
+                  </div>
+                )}
                 <div>
                   <span>עלות</span>
                   <strong>{orderMode === "demo" ? "חינם" : `${CREDITS_PER_SONG} קרדיטים`}</strong>
@@ -1109,6 +1148,12 @@ export default function Home() {
                 <dt>מה מקבלים</dt>
                 <dd>{orderMode === "demo" ? "דמו להאזנה" : "שתי גרסאות"}</dd>
               </div>
+              {orderMode === "full" && (
+                <div>
+                  <dt>משך השיר</dt>
+                  <dd>{SONG_LENGTH_OPTIONS.find((option) => option.seconds === order.songLengthSeconds)?.label}</dd>
+                </div>
+              )}
               <div>
                 <dt>עלות</dt>
                 <dd>{orderMode === "demo" ? "חינם" : `${CREDITS_PER_SONG} קרדיטים`}</dd>

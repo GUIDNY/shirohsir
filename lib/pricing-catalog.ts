@@ -41,6 +41,15 @@ export const MAJOR_EDIT_CREDITS = 3;
 export const MAX_VERSION_SECONDS = 180;
 export const SUBSCRIPTION_CREDIT_VALIDITY_DAYS = 60;
 
+// Selectable song length, same credit price regardless of choice —
+// shorter options exist mainly to fit tighter music-provider quotas.
+export const SONG_LENGTH_OPTIONS = [
+  { seconds: 60, label: "דקה אחת" },
+  { seconds: 120, label: "שתי דקות" },
+  { seconds: MAX_VERSION_SECONDS, label: "עד 3 דקות" },
+];
+export const DEFAULT_SONG_LENGTH_SECONDS = MAX_VERSION_SECONDS;
+
 export const FREE_DEMO = {
   seconds: 20,
   creditsCost: 0,
