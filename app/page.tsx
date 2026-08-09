@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
+import { Fragment, FormEvent, useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import {
   AlertTriangle,
@@ -769,16 +769,18 @@ export default function Home() {
 
         <form className="order-tool" onSubmit={submitOrder}>
           <div className="steps" aria-label="התקדמות ביצירת השיר">
-            {["סוג שיר", "הסיפור", "אימות", "סיכום"].map((label, index) => (
-              <button
-                className={step === index ? "active" : ""}
-                key={label}
-                type="button"
-                onClick={() => setStep(index)}
-              >
-                <span>{step > index ? <CheckSmall size={13} /> : index + 1}</span>
-                {label}
-              </button>
+            {["סוג שיר", "הסיפור", "אימות", "סיכום"].map((label, index, all) => (
+              <Fragment key={label}>
+                <button
+                  className={step === index ? "active" : step > index ? "done" : ""}
+                  type="button"
+                  onClick={() => setStep(index)}
+                >
+                  <span>{step > index ? <CheckSmall size={13} /> : index + 1}</span>
+                  {label}
+                </button>
+                {index < all.length - 1 && <span className="step-connector" aria-hidden="true" />}
+              </Fragment>
             ))}
           </div>
 
