@@ -1559,6 +1559,29 @@ h3 {
   }
 }
 
+@media (max-width: 560px) {
+  .steps {
+    padding: 16px 12px;
+  }
+
+  .steps button {
+    gap: 6px;
+  }
+
+  .step-label {
+    display: none;
+  }
+
+  .steps button.active .step-label {
+    display: inline;
+  }
+
+  .step-connector {
+    width: 10px;
+    margin: 0 2px;
+  }
+}
+
 .form-panel {
   padding: 28px;
 }
@@ -3439,10 +3462,20 @@ textarea:focus {
     justify-content: space-between;
   }
 
-  .hero-section,
-  .order-section,
+  .hero-section {
+    width: min(100% - 24px, 1180px);
+    padding: 40px 0 32px;
+  }
+
+  .order-section {
+    width: min(100% - 24px, 1180px);
+    padding: 44px 0;
+  }
+
   .legal-section {
     width: min(100% - 24px, 1180px);
+    padding: 44px 0;
+    gap: 28px;
   }
 
   .trust-strip,
@@ -3453,6 +3486,42 @@ textarea:focus {
   .rules-list--3,
   .rules-list--4 {
     grid-template-columns: 1fr;
+  }
+
+  .trust-strip div {
+    padding: 12px 14px;
+  }
+
+  .type-card {
+    display: grid;
+    grid-template-columns: 36px 1fr;
+    column-gap: 12px;
+    row-gap: 2px;
+    align-items: center;
+    min-height: 0;
+    padding: 14px 16px;
+    text-align: right;
+  }
+
+  .type-card-icon {
+    grid-row: span 2;
+    width: 36px;
+    height: 36px;
+  }
+
+  .type-card-check {
+    top: 10px;
+    left: 10px;
+  }
+
+  .rule-card {
+    padding: 14px;
+    gap: 12px;
+  }
+
+  .rule-icon {
+    width: 28px;
+    height: 28px;
   }
 
   .process-item {
@@ -3469,14 +3538,6 @@ textarea:focus {
   .record-sleeve {
     min-height: 320px;
     padding: 22px;
-  }
-
-  .steps {
-    grid-template-columns: 1fr;
-  }
-
-  .steps button {
-    border-bottom: 1px solid var(--line);
   }
 
   .form-level-error {

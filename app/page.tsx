@@ -777,7 +777,7 @@ export default function Home() {
                   onClick={() => setStep(index)}
                 >
                   <span>{step > index ? <CheckSmall size={13} /> : index + 1}</span>
-                  {label}
+                  <span className="step-label">{label}</span>
                 </button>
                 {index < all.length - 1 && <span className="step-connector" aria-hidden="true" />}
               </Fragment>
