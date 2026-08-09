@@ -28,13 +28,13 @@ const siteDescription = `הופכים את הסיפור שלכם לשיר איש
 
 // Runs before hydration (next/script beforeInteractive) so the correct
 // theme is set before first paint — avoids a flash of the wrong theme.
+// Dark is the site's default look (the brand identity is designed
+// dark-first); a visitor's own explicit choice in the toggle always wins.
 const themeInitScript = `
 (function () {
   try {
     var stored = localStorage.getItem("theme");
-    var theme = stored === "light" || stored === "dark"
-      ? stored
-      : (window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light");
+    var theme = stored === "light" || stored === "dark" ? stored : "dark";
     document.documentElement.setAttribute("data-theme", theme);
   } catch (e) {}
 })();

@@ -6,47 +6,13 @@
    etc.) — retheming happens here, at the token-value level, not by
    editing every component rule individually. Names are historical
    (kept from the original burgundy/cream palette) but now carry the
-   new brand's values. */
+   new brand's values.
+
+   Dark is the brand's default look (bare :root) — the toggle's
+   no-FOUC script (app/layout.tsx) always sets data-theme explicitly,
+   defaulting to "dark" unless the visitor has chosen "light" before.
+   :root[data-theme="light"] below is the opt-out override. */
 :root {
-  color-scheme: light dark;
-  --cream-50: #fdf8ff;
-  --cream-100: #f3edf9;
-  --cream-200: #ede7f3;
-  --cream-300: #cbc3d7;
-  --burgundy-600: #7c4dea;
-  --burgundy-700: #6d3bd7;
-  --burgundy-800: #5a2fc2;
-  --burgundy-900: #4a1fa8;
-  --burgundy-950: #340080;
-  --brown-800: #494454;
-  --brown-900: #1c1b1f;
-  --brown-950: #100f14;
-  --gold: #8a5a12;
-  --gold-soft: #ffdcbb;
-  --good: #2f7d5c;
-  --good-soft: #e1f0e6;
-  --bad: #ba1a1a;
-  --bad-soft: #ffdad6;
-  --line: rgba(28, 27, 31, 0.12);
-  --muted: #5c5566;
-  --glass-soft: rgba(255, 255, 255, 0.5);
-  --glass: rgba(255, 255, 255, 0.6);
-  --glass-strong: rgba(255, 255, 255, 0.85);
-  --shadow-elegant: 0 16px 30px -12px rgba(109, 59, 215, 0.14);
-  --shadow-glass: 0 6px 20px rgba(109, 59, 215, 0.08);
-  --shadow-glow: 0 0 22px -8px rgba(109, 59, 215, 0.32);
-  --shadow-vinyl: 0 18px 30px -14px rgba(0, 0, 0, 0.35);
-  --radius-card: 18px;
-  --radius-lg: 26px;
-  --background: var(--cream-50);
-  --foreground: var(--brown-900);
-}
-
-:root[data-theme="light"] {
-  color-scheme: light;
-}
-
-:root[data-theme="dark"] {
   color-scheme: dark;
   --cream-50: #131316;
   --cream-100: #1f1f22;
@@ -74,37 +40,41 @@
   --shadow-elegant: 0 16px 30px -12px rgba(0, 0, 0, 0.4);
   --shadow-glass: 0 6px 20px rgba(0, 0, 0, 0.25);
   --shadow-glow: 0 0 24px -6px rgba(208, 188, 255, 0.45);
+  --shadow-vinyl: 0 18px 30px -14px rgba(0, 0, 0, 0.35);
+  --radius-card: 18px;
+  --radius-lg: 26px;
+  --background: var(--cream-50);
+  --foreground: var(--brown-900);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root:not([data-theme="light"]):not([data-theme="dark"]) {
-    --cream-50: #131316;
-    --cream-100: #1f1f22;
-    --cream-200: #2a2a2d;
-    --cream-300: #494454;
-    --burgundy-600: #d0bcff;
-    --burgundy-700: #d0bcff;
-    --burgundy-800: #a078ff;
-    --burgundy-900: #340080;
-    --burgundy-950: #23005c;
-    --brown-800: #cbc3d7;
-    --brown-900: #e4e1e6;
-    --brown-950: #f5f3f7;
-    --gold: #ffb869;
-    --gold-soft: #ca801e;
-    --good: #8fd9b4;
-    --good-soft: #1c3a2c;
-    --bad: #ffb4ab;
-    --bad-soft: #93000a;
-    --line: rgba(228, 225, 230, 0.14);
-    --muted: #cbc3d7;
-    --glass-soft: rgba(53, 52, 56, 0.5);
-    --glass: rgba(42, 42, 45, 0.6);
-    --glass-strong: rgba(31, 31, 34, 0.85);
-    --shadow-elegant: 0 16px 30px -12px rgba(0, 0, 0, 0.4);
-    --shadow-glass: 0 6px 20px rgba(0, 0, 0, 0.25);
-    --shadow-glow: 0 0 24px -6px rgba(208, 188, 255, 0.45);
-  }
+:root[data-theme="light"] {
+  color-scheme: light;
+  --cream-50: #fdf8ff;
+  --cream-100: #f3edf9;
+  --cream-200: #ede7f3;
+  --cream-300: #cbc3d7;
+  --burgundy-600: #7c4dea;
+  --burgundy-700: #6d3bd7;
+  --burgundy-800: #5a2fc2;
+  --burgundy-900: #4a1fa8;
+  --burgundy-950: #340080;
+  --brown-800: #494454;
+  --brown-900: #1c1b1f;
+  --brown-950: #100f14;
+  --gold: #8a5a12;
+  --gold-soft: #ffdcbb;
+  --good: #2f7d5c;
+  --good-soft: #e1f0e6;
+  --bad: #ba1a1a;
+  --bad-soft: #ffdad6;
+  --line: rgba(28, 27, 31, 0.12);
+  --muted: #5c5566;
+  --glass-soft: rgba(255, 255, 255, 0.5);
+  --glass: rgba(255, 255, 255, 0.6);
+  --glass-strong: rgba(255, 255, 255, 0.85);
+  --shadow-elegant: 0 16px 30px -12px rgba(109, 59, 215, 0.14);
+  --shadow-glass: 0 6px 20px rgba(109, 59, 215, 0.08);
+  --shadow-glow: 0 0 22px -8px rgba(109, 59, 215, 0.32);
 }
 
 @theme inline {
