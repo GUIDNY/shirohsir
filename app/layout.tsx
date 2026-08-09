@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
-import { Heebo } from "next/font/google";
+import { Heebo, Montserrat } from "next/font/google";
+import Script from "next/script";
 import { singleSongPlan } from "@/lib/pricing-catalog";
 import { SITE_URL } from "@/lib/site-config";
 import "./globals.css";
@@ -11,8 +12,33 @@ const heebo = Heebo({
   display: "swap",
 });
 
-const siteTitle = "מנגינה אישית | יצירת שיר AI בעברית";
+// Latin-only — used narrowly for the "My Shirli" wordmark and the fully
+// English /en page. Heebo stays the primary font everywhere else, since
+// Montserrat has no Hebrew glyphs and would silently fall back for the
+// vast majority of the site's actual content.
+const montserrat = Montserrat({
+  variable: "--font-montserrat",
+  subsets: ["latin"],
+  weight: ["600", "700"],
+  display: "swap",
+});
+
+const siteTitle = "My Shirli | הופכים את הסיפור שלכם לשיר אישי";
 const siteDescription = `הופכים את הסיפור שלכם לשיר אישי בעברית — מערכת אוטומטית שכותבת, מלחינה ומפיקה שיר מוכן להורדה ולשיתוף במחיר של ${singleSongPlan.priceIls} ₪.`;
+
+// Runs before hydration (next/script beforeInteractive) so the correct
+// theme is set before first paint — avoids a flash of the wrong theme.
+const themeInitScript = `
+(function () {
+  try {
+    var stored = localStorage.getItem("theme");
+    var theme = stored === "light" || stored === "dark"
+      ? stored
+      : (window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light");
+    document.documentElement.setAttribute("data-theme", theme);
+  } catch (e) {}
+})();
+`;
 
 export const metadata: Metadata = {
   metadataBase: new URL(SITE_URL),
@@ -36,7 +62,7 @@ export const metadata: Metadata = {
         url: "/og.png",
         width: 1200,
         height: 630,
-        alt: "מנגינה אישית - אתר יצירת שיר AI בעברית",
+        alt: "My Shirli - אתר יצירת שיר AI בעברית",
       },
     ],
   },
@@ -54,8 +80,13 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html dir="rtl" lang="he">
-      <body className={`${heebo.variable} antialiased`}>{children}</body>
+    <html dir="rtl" lang="he" suppressHydrationWarning>
+      <head>
+        <Script id="theme-init" strategy="beforeInteractive">
+          {themeInitScript}
+        </Script>
+      </head>
+      <body className={`${heebo.variable} ${montserrat.variable} antialiased`}>{children}</body>
     </html>
   );
 }

@@ -4,7 +4,7 @@ import { MusicNote } from "../icons";
 import { SiteFooter } from "../SiteFooter";
 import { creditPacks, CREDITS_PER_SONG, singleSongPlan, subscriptionPlans } from "@/lib/pricing-catalog";
 
-const title = "Personal Melody — AI-Generated Personal Songs in Hebrew";
+const title = "My Shirli — AI-Generated Personal Songs in Hebrew";
 const description =
   "A fully automated SaaS app that turns your story into a personal Hebrew song — no human involvement, credit-based pricing.";
 
@@ -48,7 +48,7 @@ export default function EnglishPage() {
           <span className="brand-mark">
             <MusicNote size={18} strokeWidth={2.1} />
           </span>
-          <span>Personal Melody</span>
+          <span>My Shirli</span>
         </Link>
         <Link className="legal-back-link" href="/">
           עברית
@@ -59,7 +59,7 @@ export default function EnglishPage() {
         <p className="en-eyebrow">Fully automated · AI-generated · Hebrew personal songs</p>
         <h1>Turn your story into a personal Hebrew song.</h1>
         <p className="en-hero-text">
-          Personal Melody is a credit-based SaaS application. You submit a story, the system automatically writes
+          My Shirli is a credit-based SaaS application. You submit a story, the system automatically writes
           lyrics, composes music, and produces two finished audio versions — ready to download and share. There is
           no human involvement anywhere in the generation process, from checkout to download.
         </p>

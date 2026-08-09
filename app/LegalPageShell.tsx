@@ -25,7 +25,9 @@ export function LegalPageShell({
           <span className="brand-mark">
             <MusicNote size={18} strokeWidth={2.1} />
           </span>
-          <span>מנגינה אישית</span>
+          <span className="font-wordmark" dir="ltr">
+            My Shirli
+          </span>
         </Link>
         <Link className="legal-back-link" href="/">
           חזרה לעמוד הבית

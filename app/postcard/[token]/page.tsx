@@ -46,7 +46,7 @@ export async function generateMetadata({
     return { title: "גלויה לא נמצאה" };
   }
 
-  const title = `שיר בשביל ${postcard.recipient} | מנגינה אישית`;
+  const title = `שיר בשביל ${postcard.recipient} | My Shirli`;
   const description = `גלויה מוזיקלית ל${postcard.recipient} — ${postcard.occasion}`;
   const url = `/postcard/${token}`;
 
@@ -103,7 +103,10 @@ export default async function PostcardPage({ params }: { params: Promise<{ token
       </div>
 
       <Link className="postcard-cta" href="/">
-        רוצים ליצור שיר כזה גם לכם? מנגינה אישית
+        רוצים ליצור שיר כזה גם לכם?{" "}
+        <span className="font-wordmark" dir="ltr">
+          My Shirli
+        </span>
       </Link>
     </main>
   );
