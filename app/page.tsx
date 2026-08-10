@@ -714,29 +714,6 @@ export default function Home() {
         </div>
       </section>
 
-      <section id="how" className="process-band" aria-label="איך זה עובד">
-        <p className="process-band-caption">התהליך אוטומטי לחלוטין — מרגע ההזמנה ועד ההורדה, ללא מגע אנושי.</p>
-        <p className="process-band-credit">
-          השירים מופקים באמצעות <span dir="ltr">ElevenLabs Music</span>.
-        </p>
-        <div className="process-band-inner">
-          {processSteps.map((item, index) => {
-            const state =
-              index < activeProcessIndex ? "done" : index === activeProcessIndex ? "active" : "upcoming";
-
-            return (
-              <div className={`process-item process-item--${state}`} key={item.title}>
-                <span className="process-item-marker">{state === "done" ? <CheckSmall size={14} /> : index + 1}</span>
-                <div>
-                  <strong>{item.title}</strong>
-                  <span>{item.detail}</span>
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      </section>
-
       <section id="demo" className="demo-hook-section">
         <div className="demo-hook-card">
           <span className="demo-hook-icon">
@@ -1422,6 +1399,29 @@ export default function Home() {
             למעבר לעמוד המחירים
             <ArrowLeft size={16} />
           </Link>
+        </div>
+      </section>
+
+      <section id="how" className="process-band" aria-label="איך זה עובד">
+        <p className="process-band-caption">התהליך אוטומטי לחלוטין — מרגע ההזמנה ועד ההורדה, ללא מגע אנושי.</p>
+        <p className="process-band-credit">
+          השירים מופקים באמצעות <span dir="ltr">ElevenLabs Music</span>.
+        </p>
+        <div className="process-band-inner">
+          {processSteps.map((item, index) => {
+            const state =
+              index < activeProcessIndex ? "done" : index === activeProcessIndex ? "active" : "upcoming";
+
+            return (
+              <div className={`process-item process-item--${state}`} key={item.title}>
+                <span className="process-item-marker">{state === "done" ? <CheckSmall size={14} /> : index + 1}</span>
+                <div>
+                  <strong>{item.title}</strong>
+                  <span>{item.detail}</span>
+                </div>
+              </div>
+            );
+          })}
         </div>
       </section>
 

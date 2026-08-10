@@ -2446,6 +2446,10 @@ textarea:focus {
     padding: 24px 20px;
   }
 
+  .demo-hook-copy {
+    flex: none;
+  }
+
   .demo-hook-actions {
     width: 100%;
   }
