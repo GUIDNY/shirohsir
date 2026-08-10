@@ -4,7 +4,6 @@ import { ReactNode } from "react";
 import Link from "next/link";
 import { AccountPanel } from "./AccountPanel";
 import { MusicNote, Plus } from "./icons";
-import { ThemeToggle } from "./ThemeToggle";
 import { useAccount } from "./useAccount";
 
 export type NavLink = { href: string; label: string };
@@ -49,7 +48,6 @@ export function SiteHeader({
 
       <div className="topbar-end">
         {adminSlot}
-        <ThemeToggle />
         <button className="nav-cta" type="button" onClick={onNewSong}>
           <Plus size={16} />
           שיר חדש

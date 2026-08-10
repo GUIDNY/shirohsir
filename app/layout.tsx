@@ -1,6 +1,5 @@
 import type { Metadata } from "next";
 import { Heebo, Montserrat } from "next/font/google";
-import Script from "next/script";
 import { singleSongPlan } from "@/lib/pricing-catalog";
 import { SITE_URL } from "@/lib/site-config";
 import "./globals.css";
@@ -25,20 +24,6 @@ const montserrat = Montserrat({
 
 const siteTitle = "My Shirli | הופכים את הסיפור שלכם לשיר אישי";
 const siteDescription = `הופכים את הסיפור שלכם לשיר אישי בעברית — מערכת אוטומטית שכותבת, מלחינה ומפיקה שיר מוכן להורדה ולשיתוף במחיר של ${singleSongPlan.priceIls} ₪.`;
-
-// Runs before hydration (next/script beforeInteractive) so the correct
-// theme is set before first paint — avoids a flash of the wrong theme.
-// Dark is the site's default look (the brand identity is designed
-// dark-first); a visitor's own explicit choice in the toggle always wins.
-const themeInitScript = `
-(function () {
-  try {
-    var stored = localStorage.getItem("theme");
-    var theme = stored === "light" || stored === "dark" ? stored : "dark";
-    document.documentElement.setAttribute("data-theme", theme);
-  } catch (e) {}
-})();
-`;
 
 export const metadata: Metadata = {
   metadataBase: new URL(SITE_URL),
@@ -80,12 +65,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html dir="rtl" lang="he" suppressHydrationWarning>
-      <head>
-        <Script id="theme-init" strategy="beforeInteractive">
-          {themeInitScript}
-        </Script>
-      </head>
+    <html dir="rtl" lang="he">
       <body className={`${heebo.variable} ${montserrat.variable} antialiased`}>{children}</body>
     </html>
   );

@@ -1,56 +1,14 @@
 @import "tailwindcss";
 
-/* My Shirli brand tokens — violet/magenta/amber Material-3-style seed,
-   light and dark variants. Component rules throughout this file
-   reference these token NAMES only (var(--burgundy-700), var(--cream-100),
-   etc.) — retheming happens here, at the token-value level, not by
-   editing every component rule individually. Names are historical
-   (kept from the original burgundy/cream palette) but now carry the
-   new brand's values.
+/* My Shirli brand tokens — violet/magenta/amber Material-3-style seed.
+   Component rules throughout this file reference these token NAMES only
+   (var(--burgundy-700), var(--cream-100), etc.) — retheming happens
+   here, at the token-value level, not by editing every component rule
+   individually. Names are historical (kept from the original
+   burgundy/cream palette) but now carry the new brand's values.
 
-   Dark is the brand's default look (bare :root) — the toggle's
-   no-FOUC script (app/layout.tsx) always sets data-theme explicitly,
-   defaulting to "dark" unless the visitor has chosen "light" before.
-   :root[data-theme="light"] below is the opt-out override. */
+   Light is the site's only theme — no dark mode/toggle. */
 :root {
-  color-scheme: dark;
-  --cream-50: #131316;
-  --cream-100: #1f1f22;
-  --cream-200: #2a2a2d;
-  --cream-300: #494454;
-  --burgundy-600: #d0bcff;
-  --burgundy-700: #d0bcff;
-  --burgundy-800: #a078ff;
-  --burgundy-900: #340080;
-  --burgundy-950: #23005c;
-  --brown-800: #cbc3d7;
-  --brown-900: #e4e1e6;
-  --brown-950: #f5f3f7;
-  --gold: #ffb869;
-  --gold-soft: #ca801e;
-  --good: #8fd9b4;
-  --good-soft: #1c3a2c;
-  --bad: #ffb4ab;
-  --bad-soft: #93000a;
-  --line: rgba(228, 225, 230, 0.14);
-  --muted: #cbc3d7;
-  --glass-soft: rgba(53, 52, 56, 0.5);
-  --glass: rgba(42, 42, 45, 0.6);
-  --glass-strong: rgba(31, 31, 34, 0.85);
-  --shadow-elegant: 0 16px 30px -12px rgba(0, 0, 0, 0.4);
-  --shadow-glass: 0 6px 20px rgba(0, 0, 0, 0.25);
-  --shadow-glow: 0 0 24px -6px rgba(208, 188, 255, 0.45);
-  --shadow-vinyl: 0 18px 30px -14px rgba(0, 0, 0, 0.35);
-  --radius-card: 18px;
-  --radius-lg: 26px;
-  --background: var(--cream-50);
-  --foreground: var(--brown-900);
-  --field-bg: #f7f4fb;
-  --field-text: #1c1b1f;
-  --field-border: #d8d1e3;
-}
-
-:root[data-theme="light"] {
   color-scheme: light;
   --cream-50: #fdf8ff;
   --cream-100: #f3edf9;
@@ -78,6 +36,11 @@
   --shadow-elegant: 0 16px 30px -12px rgba(109, 59, 215, 0.14);
   --shadow-glass: 0 6px 20px rgba(109, 59, 215, 0.08);
   --shadow-glow: 0 0 22px -8px rgba(109, 59, 215, 0.32);
+  --shadow-vinyl: 0 18px 30px -14px rgba(0, 0, 0, 0.35);
+  --radius-card: 18px;
+  --radius-lg: 26px;
+  --background: var(--cream-50);
+  --foreground: var(--brown-900);
   --field-bg: var(--cream-50);
   --field-text: var(--brown-900);
   --field-border: var(--cream-300);
@@ -259,38 +222,6 @@ a {
   display: flex;
   align-items: center;
   gap: 12px;
-}
-
-.theme-toggle {
-  display: grid;
-  width: 42px;
-  height: 42px;
-  flex-shrink: 0;
-  place-items: center;
-  border: 1px solid var(--line);
-  border-radius: 999px;
-  background: var(--glass-soft);
-  backdrop-filter: blur(10px);
-  color: var(--burgundy-700);
-  cursor: pointer;
-  transition: transform 0.2s ease, border-color 0.2s ease;
-}
-
-.theme-toggle:hover {
-  border-color: var(--burgundy-600);
-  transform: translateY(-1px);
-}
-
-.theme-toggle-icon {
-  display: none;
-}
-
-:root[data-theme="dark"] .theme-toggle-icon--sun {
-  display: block;
-}
-
-:root:not([data-theme="dark"]) .theme-toggle-icon--moon {
-  display: block;
 }
 
 /* admin-only operational pill (music-provider quota) — never shown to
