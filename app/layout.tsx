@@ -11,7 +11,7 @@ const heebo = Heebo({
   display: "swap",
 });
 
-// Latin-only — used narrowly for the "My Shirli" wordmark and the fully
+// Latin-only — used narrowly for the "Shirli" wordmark and the fully
 // English /en page. Heebo stays the primary font everywhere else, since
 // Montserrat has no Hebrew glyphs and would silently fall back for the
 // vast majority of the site's actual content.
@@ -22,7 +22,7 @@ const montserrat = Montserrat({
   display: "swap",
 });
 
-const siteTitle = "My Shirli | הופכים את הסיפור שלכם לשיר אישי";
+const siteTitle = "Shirli | הופכים את הסיפור שלכם לשיר אישי";
 const siteDescription = `הופכים את הסיפור שלכם לשיר אישי בעברית — מערכת אוטומטית שכותבת, מלחינה ומפיקה שיר מוכן להורדה ולשיתוף במחיר של ${singleSongPlan.priceIls} ₪.`;
 
 export const metadata: Metadata = {
@@ -47,7 +47,7 @@ export const metadata: Metadata = {
         url: "/og.png",
         width: 1200,
         height: 630,
-        alt: "My Shirli - אתר יצירת שיר AI בעברית",
+        alt: "Shirli - אתר יצירת שיר AI בעברית",
       },
     ],
   },

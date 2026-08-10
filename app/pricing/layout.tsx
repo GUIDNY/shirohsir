@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 
-const title = "מחירים | My Shirli";
+const title = "מחירים | Shirli";
 const description = "שיר אישי בודד, חבילות שירים או מנוי חודשי — כל המחירים והחיסכון במקום אחד.";
 
 export const metadata: Metadata = {

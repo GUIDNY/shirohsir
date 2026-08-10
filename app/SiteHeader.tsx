@@ -3,7 +3,7 @@
 import { ReactNode } from "react";
 import Link from "next/link";
 import { AccountPanel } from "./AccountPanel";
-import { MusicNote, Plus } from "./icons";
+import { Plus } from "./icons";
 import { useAccount } from "./useAccount";
 
 export type NavLink = { href: string; label: string };
@@ -28,12 +28,12 @@ export function SiteHeader({
   return (
     <nav className="topbar" aria-label="ניווט ראשי">
       <div className="topbar-start">
-        <Link className="brand" href={homeHref} aria-label="My Shirli">
+        <Link className="brand" href={homeHref} aria-label="Shirli">
           <span className="brand-mark">
-            <MusicNote size={20} strokeWidth={2.1} />
+            <img src="/logo.svg" alt="" />
           </span>
           <span className="font-wordmark" dir="ltr">
-            My Shirli
+            Shirli
           </span>
         </Link>
 

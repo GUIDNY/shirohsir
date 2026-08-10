@@ -1,5 +1,4 @@
 import Link from "next/link";
-import { MusicNote } from "./icons";
 import { SUPPORT_EMAIL } from "@/lib/site-config";
 
 // Plain component (no hooks, no "use client") so it can drop into both
@@ -13,10 +12,10 @@ export function SiteFooter() {
       <div className="site-footer-inner">
         <div className="site-footer-brand">
           <span className="brand-mark">
-            <MusicNote size={16} strokeWidth={2.1} />
+            <img src="/logo.svg" alt="" />
           </span>
           <span className="font-wordmark" dir="ltr">
-            My Shirli
+            Shirli
           </span>
         </div>
 

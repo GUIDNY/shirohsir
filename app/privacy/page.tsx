@@ -2,8 +2,8 @@ import type { Metadata } from "next";
 import { LegalPageShell } from "../LegalPageShell";
 import { SUPPORT_EMAIL } from "@/lib/site-config";
 
-const title = "מדיניות פרטיות | My Shirli";
-const description = "אילו נתונים אוספת My Shirli, מי מעבד אותם, וכיצד לבקש גישה, תיקון או מחיקה.";
+const title = "מדיניות פרטיות | Shirli";
+const description = "אילו נתונים אוספת Shirli, מי מעבד אותם, וכיצד לבקש גישה, תיקון או מחיקה.";
 
 export const metadata: Metadata = {
   title,

@@ -1,6 +1,6 @@
 @import "tailwindcss";
 
-/* My Shirli brand tokens — violet/magenta/amber Material-3-style seed.
+/* Shirli brand tokens — violet/magenta/amber Material-3-style seed.
    Component rules throughout this file reference these token NAMES only
    (var(--burgundy-700), var(--cream-100), etc.) — retheming happens
    here, at the token-value level, not by editing every component rule
@@ -184,11 +184,14 @@ a {
   display: grid;
   width: 40px;
   height: 40px;
+  flex-shrink: 0;
   place-items: center;
-  border-radius: 14px;
-  background: linear-gradient(145deg, var(--burgundy-700), var(--burgundy-950));
-  color: var(--cream-50);
-  box-shadow: var(--shadow-glow);
+}
+
+.brand-mark img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
 }
 
 .topbar-actions {

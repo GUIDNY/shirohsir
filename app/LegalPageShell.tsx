@@ -1,6 +1,5 @@
 import { ReactNode } from "react";
 import Link from "next/link";
-import { MusicNote } from "./icons";
 import { SiteFooter } from "./SiteFooter";
 
 // Shared shell for /terms, /privacy, /refund-policy: a minimal static
@@ -23,10 +22,10 @@ export function LegalPageShell({
       <header className="legal-topbar">
         <Link className="brand" href="/">
           <span className="brand-mark">
-            <MusicNote size={18} strokeWidth={2.1} />
+            <img src="/logo.svg" alt="" />
           </span>
           <span className="font-wordmark" dir="ltr">
-            My Shirli
+            Shirli
           </span>
         </Link>
         <Link className="legal-back-link" href="/">

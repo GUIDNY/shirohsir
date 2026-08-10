@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { LegalPageShell } from "../LegalPageShell";
 import { SUPPORT_EMAIL } from "@/lib/site-config";
 
-const title = "מדיניות החזרים | My Shirli";
+const title = "מדיניות החזרים | Shirli";
 const description = "מתי אפשר לקבל החזר על קרדיטים, ומה קורה במקרה של תקלה טכנית או ביטול מנוי.";
 
 export const metadata: Metadata = {

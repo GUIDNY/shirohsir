@@ -678,7 +678,7 @@ export default function Home() {
           <div className="player-card">
             <div className="player-card-top">
               <span className="player-card-brand font-wordmark" dir="ltr">
-                My Shirli
+                Shirli
               </span>
               <span className="player-card-badge">PREMIUM</span>
             </div>

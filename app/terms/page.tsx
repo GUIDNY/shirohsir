@@ -3,8 +3,8 @@ import { LegalPageShell } from "../LegalPageShell";
 import { CREDITS_PER_SONG } from "@/lib/pricing-catalog";
 import { SUPPORT_EMAIL } from "@/lib/site-config";
 
-const title = "תנאי שימוש | My Shirli";
-const description = "תנאי השימוש באפליקציית My Shirli — מערכת SaaS מבוססת קרדיטים ליצירת שירים אישיים אוטומטית.";
+const title = "תנאי שימוש | Shirli";
+const description = "תנאי השימוש באפליקציית Shirli — מערכת SaaS מבוססת קרדיטים ליצירת שירים אישיים אוטומטית.";
 
 export const metadata: Metadata = {
   title,
@@ -33,7 +33,7 @@ export default function TermsPage() {
 
           <h2>1. Definitions &amp; Scope of Service</h2>
           <p>
-            &quot;My Shirli&quot; (&quot;the Site&quot;, &quot;the System&quot;) is a credit-based SaaS
+            &quot;Shirli&quot; (&quot;the Site&quot;, &quot;the System&quot;) is a credit-based SaaS
             application for generating personalized Hebrew songs. Using the Site requires purchasing credits in
             advance, which are used to run a fully automated generation process: you submit a story, the system
             writes the lyrics automatically, you may request a revision (also generated automatically, with no
@@ -98,7 +98,7 @@ export default function TermsPage() {
 
       <h2>1. הגדרות והיקף השירות</h2>
       <p>
-        &quot;<span dir="ltr">My Shirli</span>&quot; (&quot;האתר&quot;, &quot;המערכת&quot;) היא אפליקציית SaaS מבוססת קרדיטים ליצירת שירים
+        &quot;<span dir="ltr">Shirli</span>&quot; (&quot;האתר&quot;, &quot;המערכת&quot;) היא אפליקציית SaaS מבוססת קרדיטים ליצירת שירים
         אישיים בעברית. השימוש באתר כרוך ברכישת קרדיטים מראש, המשמשים להפעלת תהליך יצירה אוטומטי לחלוטין: הזנת
         סיפור, כתיבת מילים אוטומטית על ידי המערכת, אפשרות לבקש שינוי (המיוצר אף הוא אוטומטית, ללא בדיקה או עריכה
         אנושית), והפקת שתי גרסאות אודיו הזמינות להורדה באזור האישי. אין מעורבות אנושית בתהליך היצירה עצמו.
