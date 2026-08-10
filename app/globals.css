@@ -903,6 +903,11 @@ a {
   gap: 8px;
   padding: 56px 0 48px;
   text-align: center;
+  background-image: linear-gradient(rgba(253, 248, 255, 0.55), rgba(253, 248, 255, 0.55)), url("/hero-bg.jpg");
+  background-repeat: no-repeat;
+  background-position: center;
+  background-size: cover;
+  border-radius: var(--radius-lg);
 }
 
 .hero-section::before {
