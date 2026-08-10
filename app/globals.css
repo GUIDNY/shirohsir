@@ -45,6 +45,9 @@
   --radius-lg: 26px;
   --background: var(--cream-50);
   --foreground: var(--brown-900);
+  --field-bg: #f7f4fb;
+  --field-text: #1c1b1f;
+  --field-border: #d8d1e3;
 }
 
 :root[data-theme="light"] {
@@ -75,6 +78,9 @@
   --shadow-elegant: 0 16px 30px -12px rgba(109, 59, 215, 0.14);
   --shadow-glass: 0 6px 20px rgba(109, 59, 215, 0.08);
   --shadow-glow: 0 0 22px -8px rgba(109, 59, 215, 0.32);
+  --field-bg: var(--cream-50);
+  --field-text: var(--brown-900);
+  --field-border: var(--cream-300);
 }
 
 @theme inline {
@@ -1348,32 +1354,16 @@ h3 {
   position: relative;
   display: flex;
   flex-direction: column;
-  gap: 14px;
-  padding: 24px;
-  border: 1px solid var(--line);
-  border-radius: var(--radius-card);
-  background: var(--glass-soft);
-  backdrop-filter: blur(10px);
-  overflow: hidden;
-  transition: transform 0.25s ease, border-color 0.25s ease;
+  gap: 12px;
+  padding: 4px 2px;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  transition: opacity 0.2s ease;
 }
 
 .process-item::before {
-  position: absolute;
-  top: 0;
-  right: 0;
-  z-index: 0;
-  width: 120px;
-  height: 120px;
-  border-radius: 0 0 0 100%;
-  background: rgba(109, 59, 215, 0.12);
-  filter: blur(24px);
-  content: "";
-  pointer-events: none;
-}
-
-.process-item:hover {
-  transform: translateY(-4px);
+  content: none;
 }
 
 .process-item strong {
@@ -1396,10 +1386,10 @@ h3 {
   position: relative;
   z-index: 1;
   display: grid;
-  width: 44px;
-  height: 44px;
+  width: 40px;
+  height: 40px;
   flex: 0 0 auto;
-  border-radius: 12px;
+  border-radius: 50%;
   background: var(--cream-200);
   color: var(--burgundy-700);
   font-family: ui-monospace, "SFMono-Regular", Menlo, monospace;
@@ -1477,7 +1467,7 @@ h3 {
   overflow: hidden;
   border: 1px solid var(--cream-200);
   border-radius: var(--radius-lg);
-  background: var(--cream-50);
+  background: var(--cream-100);
   box-shadow: var(--shadow-elegant);
 }
 
@@ -2035,11 +2025,16 @@ textarea {
   min-height: 48px;
   margin-top: 8px;
   padding: 11px 14px;
-  border: 1px solid var(--cream-300);
+  border: 1px solid var(--field-border);
   border-radius: 12px;
   outline: 0;
-  background: var(--cream-50);
-  color: var(--brown-900);
+  background: var(--field-bg);
+  color: var(--field-text);
+}
+
+input::placeholder,
+textarea::placeholder {
+  color: #8a8494;
 }
 
 textarea {
@@ -2219,7 +2214,7 @@ textarea:focus {
   padding: 20px;
   border: 1px solid var(--line);
   border-radius: var(--radius-card);
-  background: var(--cream-50);
+  background: var(--cream-100);
   box-shadow: var(--shadow-glass);
 }
 
@@ -3525,9 +3520,10 @@ textarea:focus {
   }
 
   .process-item {
-    min-height: 72px;
-    padding: 14px 20px;
-    border-inline-start: 0;
+    flex-direction: row;
+    align-items: flex-start;
+    gap: 14px;
+    padding: 16px 4px;
     border-bottom: 1px solid var(--line);
   }
 
