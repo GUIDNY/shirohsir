@@ -776,7 +776,7 @@ export default function Home() {
                   type="button"
                   onClick={() => setStep(index)}
                 >
-                  <span>{step > index ? <CheckSmall size={13} /> : index + 1}</span>
+                  <span className="step-badge">{step > index ? <CheckSmall size={13} /> : index + 1}</span>
                   <span className="step-label">{label}</span>
                 </button>
                 {index < all.length - 1 && <span className="step-connector" aria-hidden="true" />}

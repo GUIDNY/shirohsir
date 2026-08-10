@@ -1430,7 +1430,7 @@ h3 {
   opacity: 1;
 }
 
-.steps button span {
+.step-badge {
   display: grid;
   width: 34px;
   height: 34px;
@@ -1445,12 +1445,16 @@ h3 {
   transition: border-color 0.2s ease, background 0.2s ease, color 0.2s ease;
 }
 
-.steps button.active span {
+.step-label {
+  white-space: nowrap;
+}
+
+.steps button.active .step-badge {
   border-color: var(--burgundy-700);
   color: var(--burgundy-700);
 }
 
-.steps button.done span {
+.steps button.done .step-badge {
   border-color: var(--burgundy-700);
   background: var(--burgundy-700);
   color: var(--cream-50);
@@ -1465,7 +1469,7 @@ h3 {
 }
 
 @media (max-width: 720px) {
-  .steps button span {
+  .step-badge {
     width: 28px;
     height: 28px;
   }
