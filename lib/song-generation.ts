@@ -453,6 +453,9 @@ const GENDERED_NIQQUD_OVERRIDES: Record<string, { male: string; female: string }
   לצדך: { male: "לְצִדְּךָ", female: "לְצִדֵּךְ" },
   ולצדך: { male: "וּלְצִדְּךָ", female: "וּלְצִדֵּךְ" },
   בעבורך: { male: "בַּעֲבוּרְךָ", female: "בַּעֲבוּרֵךְ" },
+  תוכך: { male: "תּוֹכְךָ", female: "תּוֹכֵךְ" },
+  בתוכך: { male: "בְּתוֹכְךָ", female: "בְּתוֹכֵךְ" },
+  בלעדיך: { male: "בִּלְעָדֶיךָ", female: "בִּלְעָדַיִךְ" },
   לפניך: { male: "לְפָנֶיךָ", female: "לְפָנַיִךְ" },
   אחריך: { male: "אַחֲרֶיךָ", female: "אַחֲרַיִךְ" },
 };
