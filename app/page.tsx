@@ -39,13 +39,17 @@ import { useAccount } from "./useAccount";
 type SongType = "gift" | "business" | "graduation";
 type OrderStatus = "idle" | "sending" | "ready" | "error";
 
+type LyricsMode = "auto" | "custom";
+
 type OrderPayload = {
   songType: SongType;
   recipient: string;
   occasionChip: string;
   occasionCustom: string;
+  lyricsMode: LyricsMode;
   story: string;
   mustInclude: string;
+  customLyrics: string;
   moods: string[];
   inspiration: string;
   avoid: string;
@@ -122,8 +126,10 @@ const initialOrder: OrderPayload = {
   recipient: "",
   occasionChip: "",
   occasionCustom: "",
+  lyricsMode: "auto",
   story: "",
   mustInclude: "",
+  customLyrics: "",
   moods: [],
   inspiration: "",
   avoid: "",
@@ -172,8 +178,8 @@ function getMissingFieldInfo(order: OrderPayload): { label: string; step: number
     return { label: "פירוט האירוע", step: 1 };
   }
 
-  if (!order.story.trim()) {
-    return { label: "הסיפור", step: 1 };
+  if (order.lyricsMode === "custom" ? !order.customLyrics.trim() : !order.story.trim()) {
+    return { label: order.lyricsMode === "custom" ? "מילות השיר" : "הסיפור", step: 1 };
   }
 
   if (!order.customerName.trim()) {
@@ -194,7 +200,12 @@ function getMissingFieldInfo(order: OrderPayload): { label: string; step: number
 function buildConfirmationSummary(order: OrderPayload) {
   const occasion = resolveOccasion(order) || "האירוע שסיפרתם עליו";
   const recipient = order.recipient.trim() || "מי שבחרתם";
-  const sentences = [`השיר הוא ל${recipient}, לרגל ${occasion}.`, "קראנו את הסיפור ששיתפתם ונשלב אותו במילות השיר."];
+  const sentences = [
+    `השיר הוא ל${recipient}, לרגל ${occasion}.`,
+    order.lyricsMode === "custom"
+      ? "נפיק את השיר בדיוק לפי המילים שכתבתם."
+      : "קראנו את הסיפור ששיתפתם ונשלב אותו במילות השיר.",
+  ];
 
   if (order.moods.length > 0) {
     const moodsText = order.moods.join(" ו");
@@ -398,8 +409,12 @@ export default function Home() {
   const selectedType = songTypes.find((item) => item.id === order.songType) ?? songTypes[0];
   const resolvedOccasion = resolveOccasion(order);
   const canPreviewLyrics = Boolean(
-    order.recipient.trim() && resolvedOccasion && order.story.trim() && order.recipientGender,
+    order.recipient.trim() &&
+      resolvedOccasion &&
+      order.recipientGender &&
+      (order.lyricsMode === "custom" ? order.customLyrics.trim() : order.story.trim()),
   );
+  const displayLyricsPreview = order.lyricsMode === "custom" ? order.customLyrics : lyricsPreview;
 
   // Fetch the real generated lyrics (not just a summary sentence) whenever
   // the customer reaches the confirm step, so they can catch a mistake
@@ -407,7 +422,7 @@ export default function Home() {
   // getHebrewLyrics() calls Gemini (a real, quota'd API), so debounce
   // this instead of firing on every keystroke while editing on step 2.
   useEffect(() => {
-    if (step !== 2 || !accessToken || !canPreviewLyrics) {
+    if (step !== 2 || !accessToken || !canPreviewLyrics || order.lyricsMode === "custom") {
       return;
     }
 
@@ -455,6 +470,7 @@ export default function Home() {
     step,
     accessToken,
     canPreviewLyrics,
+    order.lyricsMode,
     order.songType,
     order.recipient,
     resolvedOccasion,
@@ -467,7 +483,8 @@ export default function Home() {
     order.songLengthSeconds,
   ]);
   const completion = useMemo(() => {
-    const required = [order.recipient, resolveOccasion(order), order.story, order.customerName, order.email, order.phone];
+    const lyricsValue = order.lyricsMode === "custom" ? order.customLyrics : order.story;
+    const required = [order.recipient, resolveOccasion(order), lyricsValue, order.customerName, order.email, order.phone];
     const filled = required.filter((value) => value.trim().length > 0).length;
     return Math.round((filled / required.length) * 100);
   }, [order]);
@@ -551,6 +568,7 @@ export default function Home() {
           inspiration: order.inspiration,
           story: order.story,
           mustInclude: order.mustInclude,
+          customLyrics: order.customLyrics,
           avoid: order.avoid,
           customerName: order.customerName,
           email: order.email,
@@ -887,28 +905,68 @@ export default function Home() {
                 )}
               </div>
 
-              <label className="story-field story-field--main">
-                <span className="story-field-label">ספרו לנו קצת על {order.recipient.trim() || "האדם שהשיר בשבילו"}</span>
-                <textarea
-                  className="story-textarea"
-                  required
-                  value={order.story}
-                  onChange={(event) => setField("story", event.target.value)}
-                  placeholder={
-                    "איך הכרתם? מה אתם אוהבים לעשות יחד? משהו מצחיק שקרה? רגע שלא תשכחו? כינוי מיוחד? פרטים שמאפיינים אותו או אותה?\n\nלא צריך לנסח יפה, פשוט תספרו לנו. המערכת כבר תהפוך את זה לשיר."
-                  }
-                />
-                <span className="story-field-hint">ככל שתספרו יותר, השיר ירגיש יותר אישי.</span>
-              </label>
+              <div className="chip-field">
+                <span className="story-field-label">איך רוצים לכתוב את מילות השיר?</span>
+                <div className="occasion-chips">
+                  <button
+                    className={order.lyricsMode === "auto" ? "occasion-chip selected" : "occasion-chip"}
+                    onClick={() => setField("lyricsMode", "auto")}
+                    type="button"
+                  >
+                    נכתוב לכם מהסיפור
+                  </button>
+                  <button
+                    className={order.lyricsMode === "custom" ? "occasion-chip selected" : "occasion-chip"}
+                    onClick={() => setField("lyricsMode", "custom")}
+                    type="button"
+                  >
+                    יש לנו מילים מוכנות
+                  </button>
+                </div>
+              </div>
 
-              <label className="story-field">
-                <span className="story-field-label">יש משהו שחייב להופיע בשיר?</span>
-                <input
-                  onChange={(event) => setField("mustInclude", event.target.value)}
-                  placeholder="למשל: הכינוי 'במבה', הטיול ליוון, המשפט שהוא תמיד אומר..."
-                  value={order.mustInclude}
-                />
-              </label>
+              {order.lyricsMode === "auto" ? (
+                <>
+                  <label className="story-field story-field--main">
+                    <span className="story-field-label">
+                      ספרו לנו קצת על {order.recipient.trim() || "האדם שהשיר בשבילו"}
+                    </span>
+                    <textarea
+                      className="story-textarea"
+                      required
+                      value={order.story}
+                      onChange={(event) => setField("story", event.target.value)}
+                      placeholder={
+                        "איך הכרתם? מה אתם אוהבים לעשות יחד? משהו מצחיק שקרה? רגע שלא תשכחו? כינוי מיוחד? פרטים שמאפיינים אותו או אותה?\n\nלא צריך לנסח יפה, פשוט תספרו לנו. המערכת כבר תהפוך את זה לשיר."
+                      }
+                    />
+                    <span className="story-field-hint">ככל שתספרו יותר, השיר ירגיש יותר אישי.</span>
+                  </label>
+
+                  <label className="story-field">
+                    <span className="story-field-label">יש משהו שחייב להופיע בשיר?</span>
+                    <input
+                      onChange={(event) => setField("mustInclude", event.target.value)}
+                      placeholder="למשל: הכינוי 'במבה', הטיול ליוון, המשפט שהוא תמיד אומר..."
+                      value={order.mustInclude}
+                    />
+                  </label>
+                </>
+              ) : (
+                <label className="story-field story-field--main">
+                  <span className="story-field-label">הדביקו כאן את מילות השיר המלאות</span>
+                  <textarea
+                    className="story-textarea"
+                    required
+                    value={order.customLyrics}
+                    onChange={(event) => setField("customLyrics", event.target.value)}
+                    placeholder={
+                      "אפשר לכתוב את כל מילות השיר כמו שהן.\n\nאם נוח לכם, אפשר לסמן קטעים עם [Verse] ו-[Chorus] בשורה נפרדת — אבל זה ממש לא חובה, גם טקסט רציף עובד מצוין."
+                    }
+                  />
+                  <span className="story-field-hint">נפיק את השיר בדיוק לפי המילים שכתבתם, בלי לשנות אותן.</span>
+                </label>
+              )}
 
               <div className="chip-field">
                 <span className="story-field-label">איך אתם רוצים שהשיר ירגיש?</span>
@@ -983,7 +1041,7 @@ export default function Home() {
                 </div>
               </div>
 
-              {order.story.trim().length < 15 && (
+              {order.lyricsMode === "auto" && order.story.trim().length < 15 && (
                 <p className="confirm-nudge">
                   <AlertTriangle size={15} />
                   רגע — ספרו לנו עוד קצת כדי שהשיר יצא מדויק יותר.
@@ -1001,19 +1059,19 @@ export default function Home() {
                 <div className="lyrics-draft-preview">
                   <span className="story-field-label">כך יראו מילות השיר</span>
 
-                  {!lyricsPreview && !lyricsPreviewError && (
+                  {!displayLyricsPreview && order.lyricsMode === "auto" && !lyricsPreviewError && (
                     <p className="lyrics-draft-preview-status">טוענים את המילים...</p>
                   )}
 
-                  {lyricsPreviewError && !lyricsPreview && (
+                  {!displayLyricsPreview && order.lyricsMode === "auto" && lyricsPreviewError && (
                     <p className="lyrics-draft-preview-status">
                       לא הצלחנו לטעון תצוגה מקדימה של המילים כרגע — אפשר להמשיך בכל זאת.
                     </p>
                   )}
 
-                  {lyricsPreview && (
+                  {displayLyricsPreview && (
                     <div className="lyrics-draft-preview-card">
-                      {lyricsPreview.split("\n").map((line, index) =>
+                      {displayLyricsPreview.split("\n").map((line, index) =>
                         /^\[[^\]]+\]$/.test(line.trim()) ? (
                           <span className="lyrics-draft-preview-tag" key={index}>
                             {line.trim().replace(/[[\]]/g, "")}

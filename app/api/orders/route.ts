@@ -6,6 +6,7 @@ import { CREDITS_PER_SONG, FREE_DEMO, MAX_VERSION_SECONDS, SONG_LENGTH_OPTIONS }
 import { createServerClient } from "@/lib/supabase-server";
 import {
   createSongVersion,
+  customLyricsText,
   fetchElevenLabsQuota,
   GeneratedVersion,
   inferSongAttributes,
@@ -40,10 +41,12 @@ type OrderResponse = {
 // mood chips and writes the story; inferSongAttributes() derives the rest
 // (see lib/song-generation.ts) so the generation pipeline itself doesn't
 // need to change.
+// "story" isn't in this fixed list — a customer who already wrote their
+// own finished lyrics (order.customLyrics) doesn't fill in a story; see
+// the combined story/customLyrics check in POST() below.
 const requiredFields: Array<keyof OrderPayload> = [
   "recipient",
   "occasion",
-  "story",
   "customerName",
   "email",
   "phone",
@@ -74,6 +77,8 @@ function orderInsertRow(
     story: text(order.story),
     must_include: text(order.mustInclude),
     avoid: text(order.avoid),
+    lyrics_mode: customLyricsText(order.customLyrics) ? "custom" : "auto",
+    custom_lyrics: customLyricsText(order.customLyrics),
     customer_name: text(order.customerName),
     customer_email: text(order.email),
     customer_phone: text(order.phone),
@@ -89,6 +94,10 @@ function orderInsertRow(
 export async function POST(request: NextRequest) {
   const order = (await request.json()) as OrderPayload;
   const missing = requiredFields.filter((field) => !text(order[field]));
+
+  if (!text(order.story) && !customLyricsText(order.customLyrics)) {
+    missing.push("story");
+  }
 
   if (missing.length > 0 || order.consent !== true) {
     return NextResponse.json(

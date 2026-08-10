@@ -35,7 +35,7 @@ export async function POST(request: NextRequest, ctx: RouteContext<"/api/orders/
   const { data: order } = await supabase
     .from("orders")
     .select(
-      "id, user_id, song_type, recipient, occasion, style, mood, vocalist, language_register, lyric_structure, pronunciation, story, must_include, avoid, song_length_seconds, recipient_gender",
+      "id, user_id, song_type, recipient, occasion, style, mood, vocalist, language_register, lyric_structure, pronunciation, story, must_include, avoid, song_length_seconds, recipient_gender, custom_lyrics",
     )
     .eq("id", orderId)
     .maybeSingle();
@@ -81,6 +81,7 @@ export async function POST(request: NextRequest, ctx: RouteContext<"/api/orders/
     mustInclude: body?.mustInclude !== undefined ? text(body.mustInclude) : order.must_include,
     avoid: body?.avoid !== undefined ? text(body.avoid) : order.avoid,
     recipientGender,
+    customLyrics: order.custom_lyrics || "",
   };
 
   try {

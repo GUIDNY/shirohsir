@@ -18,6 +18,9 @@ export type OrderContent = {
   mustInclude?: string;
   avoid?: string;
   recipientGender?: "male" | "female";
+  // Customer-supplied finished lyrics, used verbatim instead of writing
+  // lyrics from `story` — see getHebrewLyrics().
+  customLyrics?: string;
 };
 
 export type GeneratedVersion = {
@@ -42,6 +45,13 @@ export class MusicProviderError extends Error {
 
 export function text(value: unknown) {
   return typeof value === "string" ? value.trim().slice(0, 1200) : "";
+}
+
+// A full set of song lyrics runs longer than the general free-text cap
+// above (multiple verses + chorus repeats for a 3-minute song) — capped
+// separately so a customer's own finished lyrics don't get cut short.
+export function customLyricsText(value: unknown) {
+  return typeof value === "string" ? value.trim().slice(0, 3000) : "";
 }
 
 const styleDirections: Record<string, string> = {
@@ -562,6 +572,12 @@ async function generateLyricsWithGemini(order: OrderContent, songSeconds: number
 // order flow degrades gracefully instead of ever failing outright
 // because of the AI provider.
 export async function getHebrewLyrics(order: OrderContent, songSeconds = 20): Promise<string> {
+  const customLyrics = customLyricsText(order.customLyrics);
+
+  if (customLyrics) {
+    return customLyrics;
+  }
+
   const aiLyrics = await generateLyricsWithGemini(order, songSeconds);
 
   return aiLyrics ?? buildHebrewLyrics(order, songSeconds);

@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getUserFromRequest } from "@/lib/auth-user";
 import { MAX_VERSION_SECONDS, SONG_LENGTH_OPTIONS } from "@/lib/pricing-catalog";
-import { addNiqqud, getHebrewLyrics, inferSongAttributes, OrderContent, text } from "@/lib/song-generation";
+import { addNiqqud, customLyricsText, getHebrewLyrics, inferSongAttributes, OrderContent, text } from "@/lib/song-generation";
 
 type PreviewPayload = OrderContent & {
   moods?: string[];
@@ -17,7 +17,7 @@ type PreviewPayload = OrderContent & {
 export async function POST(request: NextRequest) {
   const order = (await request.json()) as PreviewPayload;
 
-  if (!text(order.recipient) || !text(order.occasion) || !text(order.story)) {
+  if (!text(order.recipient) || !text(order.occasion) || (!text(order.story) && !customLyricsText(order.customLyrics))) {
     return NextResponse.json({ error: "חסרים פרטים בטופס" }, { status: 400 });
   }
 
