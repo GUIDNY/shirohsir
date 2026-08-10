@@ -182,15 +182,14 @@ a {
 
 .brand-mark {
   display: grid;
-  width: 40px;
-  height: 40px;
   flex-shrink: 0;
   place-items: center;
 }
 
 .brand-mark img {
-  width: 100%;
-  height: 100%;
+  height: 48px;
+  width: auto;
+  max-width: none;
   object-fit: contain;
 }
 
@@ -3767,10 +3766,8 @@ textarea:focus {
   font-size: 0.92rem;
 }
 
-.site-footer-brand .brand-mark {
-  width: 30px;
-  height: 30px;
-  border-radius: 10px;
+.site-footer-brand .brand-mark img {
+  height: 36px;
 }
 
 .site-footer-links {

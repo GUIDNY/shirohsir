@@ -22,10 +22,7 @@ export function LegalPageShell({
       <header className="legal-topbar">
         <Link className="brand" href="/">
           <span className="brand-mark">
-            <img src="/logo.png" alt="" />
-          </span>
-          <span className="font-wordmark" dir="ltr">
-            Shirli
+            <img src="/logo.png" alt="Shirli" />
           </span>
         </Link>
         <Link className="legal-back-link" href="/">

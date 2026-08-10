@@ -12,10 +12,7 @@ export function SiteFooter() {
       <div className="site-footer-inner">
         <div className="site-footer-brand">
           <span className="brand-mark">
-            <img src="/logo.png" alt="" />
-          </span>
-          <span className="font-wordmark" dir="ltr">
-            Shirli
+            <img src="/logo.png" alt="Shirli" />
           </span>
         </div>
 
