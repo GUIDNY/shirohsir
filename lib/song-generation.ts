@@ -424,12 +424,150 @@ export function buildHebrewLyrics(order: OrderContent, songSeconds = 20) {
   );
 }
 
+const GEMINI_MODEL = process.env.GEMINI_MODEL_ID || "gemini-2.5-flash";
+
+// ־ך-suffixed 2nd-person words whose consonants are identical for
+// masculine/feminine (only niqqud differs) — the prompt below tells
+// Gemini to avoid these, but LLM instruction-following isn't
+// guaranteed. Rather than reject any response that slips one in
+// (which turned out to reject nearly every response — these are
+// extremely common, natural words), addNiqqud() forces the correct
+// gendered niqqud for exactly these words via Nakdan's own per-word
+// tokenization, using order.recipientGender instead of trusting
+// Nakdan's own (unreliable, context-based) guess.
+const GENDERED_NIQQUD_OVERRIDES: Record<string, { male: string; female: string }> = {
+  לך: { male: "לְךָ", female: "לָךְ" },
+  אותך: { male: "אוֹתְךָ", female: "אוֹתָךְ" },
+  שלך: { male: "שֶׁלְּךָ", female: "שֶׁלָּךְ" },
+  איתך: { male: "אִתְּךָ", female: "אִתָּךְ" },
+  אתך: { male: "אִתְּךָ", female: "אִתָּךְ" },
+  בשבילך: { male: "בִּשְׁבִילְךָ", female: "בִּשְׁבִילֵךְ" },
+  אצלך: { male: "אֶצְלְךָ", female: "אֶצְלֵךְ" },
+  בזכותך: { male: "בִּזְכוּתְךָ", female: "בִּזְכוּתֵךְ" },
+  בגללך: { male: "בִּגְלָלְךָ", female: "בִּגְלָלֵךְ" },
+  כמוך: { male: "כָּמוֹךָ", female: "כָּמוֹךְ" },
+  ממך: { male: "מִמְּךָ", female: "מִמֵּךְ" },
+  עצמך: { male: "עַצְמְךָ", female: "עַצְמֵךְ" },
+  סביבך: { male: "סְבִיבְךָ", female: "סְבִיבֵךְ" },
+  מסביבך: { male: "מִסְּבִיבְךָ", female: "מִסְּבִיבֵךְ" },
+  לצדך: { male: "לְצִדְּךָ", female: "לְצִדֵּךְ" },
+  ולצדך: { male: "וּלְצִדְּךָ", female: "וּלְצִדֵּךְ" },
+  בעבורך: { male: "בַּעֲבוּרְךָ", female: "בַּעֲבוּרֵךְ" },
+  לפניך: { male: "לְפָנֶיךָ", female: "לְפָנַיִךְ" },
+  אחריך: { male: "אַחֲרֶיךָ", female: "אַחֲרַיִךְ" },
+};
+
+function geminiApiKey() {
+  return cleanApiKey(process.env.GEMINI_API_KEY);
+}
+
+function lyricsStructureHint(songSeconds: number) {
+  if (songSeconds > 140) {
+    return '6 קטעים בסה"כ: [Verse] ואז [Chorus], אחר כך [Verse] שני ואז [Chorus] שוב, ולבסוף [Bridge] קצר ו-[Chorus] אחרון.';
+  }
+
+  if (songSeconds > 60) {
+    return '4 קטעים בסה"כ: [Verse] ואז [Chorus], ואז [Verse] שני נוסף ו-[Chorus] שוב.';
+  }
+
+  return '2 קטעים בלבד: [Verse] קצר אחד ו-[Chorus] קצר אחד.';
+}
+
+// Calls Gemini for real (non-templated) Hebrew lyrics. Returns null on
+// any failure — missing key, provider error, timeout, or a response
+// that doesn't look like structured lyrics — so the caller can fall
+// back to buildHebrewLyrics() rather than ever surfacing a broken or
+// empty result to the customer.
+async function generateLyricsWithGemini(order: OrderContent, songSeconds: number): Promise<string | null> {
+  const apiKey = geminiApiKey();
+
+  if (!apiKey) {
+    return null;
+  }
+
+  const isFemale = order.recipientGender === "female";
+  const prompt = [
+    "כתוב מילים לשיר פופ אישי בעברית, מבוסס על הפרטים הבאים:",
+    `- מוקדש ל: ${text(order.pronunciation) || text(order.recipient) || "האדם המיוחד הזה"}`,
+    `- אירוע: ${text(order.occasion) || "רגע מיוחד"}`,
+    `- סיפור/פרטים אישיים לשלב בשיר: ${text(order.story) || "אין פרטים נוספים, תשתמש באווירה כללית של האירוע"}`,
+    text(order.mustInclude) ? `- חובה לשלב בצורה טבעית בתוך המילים: ${text(order.mustInclude)}` : "",
+    text(order.avoid) ? `- אסור בשום אופן להזכיר או לרמוז על: ${text(order.avoid)}` : "",
+    isFemale ? "- פנייה בלשון נקבה לאורך כל השיר, מההתחלה ועד הסוף כולל הברידג'." : "- פנייה בלשון זכר לאורך כל השיר.",
+    "- חשוב מאוד, בלי שום יוצא מן הכלל: אסור להשתמש במילים המסתיימות ב-ך שכתיבן זהה לזכר ולנקבה — למשל לך, אותך, שלך, איתך, בשבילך, אצלך, מולך, בזכותך, בגללך, כמוך, ממך, לפניך, אחריך. במקום זה תמיד תשתמש בניסוחים חד-משמעיים כמו 'עלייך/עליך', 'אלייך/אליך', בשם עצמו (למשל 'נועה' במקום 'לך'), או בגוף שלישי.",
+    `- מבנה נדרש: ${lyricsStructureHint(songSeconds)}`,
+    "- עברית ישראלית טבעית ומודרנית, קלילה לשירה, חרוזים כשמתאפשר בטבעיות. בלי מילים באנגלית ובלי גיבריש.",
+    "- סמן כל קטע עם תגית בשורה נפרדת: [Verse] / [Chorus] / [Bridge].",
+    "- החזר אך ורק את מילות השיר עם התגיות שלהן — בלי כותרת, בלי הסברים, בלי מירכאות.",
+  ]
+    .filter(Boolean)
+    .join("\n");
+
+  try {
+    const response = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${apiKey}`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          contents: [{ parts: [{ text: prompt }] }],
+          // "Thinking" mode roughly quadruples latency (~13s vs ~3.5s in
+          // testing) for no measurable quality gain on a short lyric-writing
+          // task — disabled so the preview step stays responsive.
+          generationConfig: { thinkingConfig: { thinkingBudget: 0 } },
+        }),
+        signal: AbortSignal.timeout(12000),
+      },
+    );
+
+    if (!response.ok) {
+      console.error(`[GEMINI_LYRICS_FALLBACK] http ${response.status}`);
+      return null;
+    }
+
+    const data = (await response.json()) as {
+      candidates?: Array<{ content?: { parts?: Array<{ text?: string }> } }>;
+    };
+    const raw = data.candidates?.[0]?.content?.parts?.[0]?.text;
+
+    if (!raw) {
+      console.error("[GEMINI_LYRICS_FALLBACK] empty response");
+      return null;
+    }
+
+    const cleaned = raw.trim();
+
+    // Sanity-check the shape rather than trusting the model blindly —
+    // catches refusals, empty completions, or missing structure tags.
+    if (!/\[Verse\]/i.test(cleaned) || !/\[Chorus\]/i.test(cleaned) || cleaned.length < 20 || cleaned.length > 2000) {
+      console.error("[GEMINI_LYRICS_FALLBACK] malformed response shape");
+      return null;
+    }
+
+    return cleaned;
+  } catch (err) {
+    console.error("[GEMINI_LYRICS_FALLBACK] request failed", err instanceof Error ? err.message : err);
+    return null;
+  }
+}
+
+// Single entry point every caller should use to get lyrics text: real
+// AI-written lyrics from Gemini when GEMINI_API_KEY is configured and
+// the call succeeds, otherwise the deterministic template — so the
+// order flow degrades gracefully instead of ever failing outright
+// because of the AI provider.
+export async function getHebrewLyrics(order: OrderContent, songSeconds = 20): Promise<string> {
+  const aiLyrics = await generateLyricsWithGemini(order, songSeconds);
+
+  return aiLyrics ?? buildHebrewLyrics(order, songSeconds);
+}
+
 type NakdanToken = {
   nakdan?: { options?: Array<{ w?: string }>; sep?: boolean };
   str?: string;
 };
 
-async function addNiqqudToLine(line: string): Promise<string> {
+async function addNiqqudToLine(line: string, isFemale: boolean): Promise<string> {
   const trimmed = line.trim();
 
   // Structure tags like [Verse]/[Chorus]/[Hook] are ElevenLabs formatting,
@@ -467,7 +605,15 @@ async function addNiqqudToLine(line: string): Promise<string> {
     }
 
     return payload.data
-      .map((token) => token.nakdan?.options?.[0]?.w || token.str || "")
+      .map((token) => {
+        const override = token.str ? GENDERED_NIQQUD_OVERRIDES[token.str.trim()] : undefined;
+
+        if (override) {
+          return isFemale ? override.female : override.male;
+        }
+
+        return token.nakdan?.options?.[0]?.w || token.str || "";
+      })
       .join("")
       .replace(/\|/g, "");
   } catch {
@@ -477,9 +623,9 @@ async function addNiqqudToLine(line: string): Promise<string> {
   }
 }
 
-export async function addNiqqud(lyrics: string): Promise<string> {
+export async function addNiqqud(lyrics: string, isFemale = false): Promise<string> {
   const lines = lyrics.split("\n");
-  const vocalized = await Promise.all(lines.map((line) => addNiqqudToLine(line)));
+  const vocalized = await Promise.all(lines.map((line) => addNiqqudToLine(line, isFemale)));
 
   return vocalized.join("\n");
 }
@@ -607,7 +753,7 @@ export async function createSongVersion(order: OrderContent, songSeconds: number
     `https://api.elevenlabs.io/v1/music/stream?output_format=${encodeURIComponent(outputFormat)}`;
   const musicLengthMs = songSeconds * 1000;
   const modelId = process.env.ELEVENLABS_MUSIC_MODEL_ID || "music_v2";
-  const lyrics = buildHebrewLyrics(order, songSeconds);
+  const lyrics = await getHebrewLyrics(order, songSeconds);
   const positiveStyles = [
     directionFor(styleDirections, order.style),
     directionFor(moodDirections, order.mood),
@@ -643,7 +789,7 @@ export async function createSongVersion(order: OrderContent, songSeconds: number
   // niqqud before we hand the lyrics to ElevenLabs. Falls back to the plain
   // text line-by-line on any failure, so a slow/unreachable Nakdan never
   // blocks or breaks song generation.
-  const vocalizedLyrics = await addNiqqud(lyrics);
+  const vocalizedLyrics = await addNiqqud(lyrics, order.recipientGender === "female");
 
   const providerResponse = await fetch(apiUrl, {
     method: "POST",

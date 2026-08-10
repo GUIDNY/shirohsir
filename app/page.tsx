@@ -404,8 +404,8 @@ export default function Home() {
   // Fetch the real generated lyrics (not just a summary sentence) whenever
   // the customer reaches the confirm step, so they can catch a mistake
   // before the paid step actually spends credits and calls ElevenLabs.
-  // buildHebrewLyrics() is a pure template function, so this preview
-  // always matches what the real order will produce for the same inputs.
+  // getHebrewLyrics() calls Gemini (a real, quota'd API), so debounce
+  // this instead of firing on every keystroke while editing on step 2.
   useEffect(() => {
     if (step !== 2 || !accessToken || !canPreviewLyrics) {
       return;
@@ -413,40 +413,43 @@ export default function Home() {
 
     let cancelled = false;
 
-    fetch("/api/orders/preview-lyrics", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${accessToken}`,
-      },
-      body: JSON.stringify({
-        songType: order.songType,
-        recipient: order.recipient,
-        occasion: resolvedOccasion,
-        moods: order.moods,
-        inspiration: order.inspiration,
-        story: order.story,
-        mustInclude: order.mustInclude,
-        avoid: order.avoid,
-        recipientGender: order.recipientGender,
-        songLengthSeconds: order.songLengthSeconds,
-      }),
-    })
-      .then((response) => (response.ok ? response.json() : Promise.reject(response)))
-      .then((data: { lyrics: string }) => {
-        if (!cancelled) {
-          setLyricsPreview(data.lyrics);
-          setLyricsPreviewError(false);
-        }
+    const timeoutId = setTimeout(() => {
+      fetch("/api/orders/preview-lyrics", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${accessToken}`,
+        },
+        body: JSON.stringify({
+          songType: order.songType,
+          recipient: order.recipient,
+          occasion: resolvedOccasion,
+          moods: order.moods,
+          inspiration: order.inspiration,
+          story: order.story,
+          mustInclude: order.mustInclude,
+          avoid: order.avoid,
+          recipientGender: order.recipientGender,
+          songLengthSeconds: order.songLengthSeconds,
+        }),
       })
-      .catch(() => {
-        if (!cancelled) {
-          setLyricsPreviewError(true);
-        }
-      });
+        .then((response) => (response.ok ? response.json() : Promise.reject(response)))
+        .then((data: { lyrics: string }) => {
+          if (!cancelled) {
+            setLyricsPreview(data.lyrics);
+            setLyricsPreviewError(false);
+          }
+        })
+        .catch(() => {
+          if (!cancelled) {
+            setLyricsPreviewError(true);
+          }
+        });
+    }, 600);
 
     return () => {
       cancelled = true;
+      clearTimeout(timeoutId);
     };
   }, [
     step,
