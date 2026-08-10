@@ -644,10 +644,6 @@ export default function Home() {
 
       <section id="top" className="hero-section">
         <div className="hero-copy">
-          <p className="eyebrow">
-            <span className="eyebrow-dot" />
-            שירים אישיים בעברית, מוכנים תוך דקות
-          </p>
           <h1>הופכים את הסיפור שלכם לשיר אישי.</h1>
           <p className="hero-text">
             ספרו למערכת על האדם, האירוע והרגעים החשובים. המערכת כותבת, מלחינה ומפיקה שיר מקורי אוטומטית
