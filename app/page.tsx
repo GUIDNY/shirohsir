@@ -659,12 +659,6 @@ export default function Home() {
           </div>
           <dl className="trust-strip" aria-label="למה לבחור בנו">
             <div>
-              <dt>
-                {CREDITS_PER_SONG} קרדיטים — {singleSongPlan.priceIls} ₪
-              </dt>
-              <dd>מחיר קבוע וברור, ומאזינים לדמו חינם לפני שמשלמים.</dd>
-            </div>
-            <div>
               <dt>שתי גרסאות לבחירה</dt>
               <dd>תקבלו שתי גרסאות שונות ותבחרו את זו שאתם הכי אוהבים.</dd>
             </div>
@@ -699,16 +693,6 @@ export default function Home() {
                 <strong className="cover-title">השיר של נועה</strong>
                 <span className="cover-subtitle">פופ ישראלי</span>
               </div>
-            </div>
-          </div>
-
-          <div className="player-line">
-            <span className="player-icon">
-              <Lyrics size={20} />
-            </span>
-            <div>
-              <strong>טיוטת מילים לאישור</strong>
-              <span>מוצגת באזור האישי לפני ההפקה</span>
             </div>
           </div>
         </div>
