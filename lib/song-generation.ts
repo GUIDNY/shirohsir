@@ -107,6 +107,25 @@ function firstSentence(value: unknown) {
   return line(sentence, "יש סיפור קטן שכולם זוכרים");
 }
 
+// Used for longer songs (see buildHebrewLyrics) to give the second verse
+// its own line instead of just repeating the first — pulled from the
+// customer's own story text when there's more than one sentence there,
+// otherwise a generic (gender-neutral, no ambiguous ־ך suffix) filler.
+function secondSentence(value: unknown) {
+  const clean = text(value).replace(/\s+/g, " ");
+  const sentences = clean
+    .split(/[.!?。!?\n]/)
+    .map((s) => s.trim())
+    .filter(Boolean);
+  const candidate = sentences[1];
+
+  if (!candidate || /[A-Za-z]/.test(candidate) || candidate.split(/\s+/).some((word) => word.length > 10)) {
+    return "";
+  }
+
+  return line(candidate);
+}
+
 function storyLyricLine(order: OrderContent) {
   const story = text(order.story);
   const occasion = text(order.occasion);
@@ -306,70 +325,103 @@ export function inferSongAttributes(input: StoryInput): InferredAttributes {
 // for the downstream Nakdan diacritization call to guess gender from
 // an ambiguous consonant spelling, so the disambiguation has to happen
 // here, in the template text itself).
-export function buildHebrewLyrics(order: OrderContent) {
+// A short template (one verse + one chorus/hook) reads as a full song
+// around 20-60 seconds, but the customer can pick up to 3 minutes
+// (SONG_LENGTH_OPTIONS) — without more structure, ElevenLabs has to
+// stretch that same handful of lines across the whole requested
+// duration through repetition/instrumental padding. Past ~60s this
+// appends a second verse + chorus repeat, and past ~140s a bridge +
+// final chorus, so longer songs actually have a longer written song
+// instead of just a longer instrumental fade.
+function extendForLength(
+  core: string[],
+  repeatBlock: string[],
+  songSeconds: number,
+  elaboration: string,
+  bridge: string,
+) {
+  const lines = [...core];
+
+  if (songSeconds > 60) {
+    lines.push("[Verse]", elaboration, ...repeatBlock);
+  }
+
+  if (songSeconds > 140) {
+    lines.push("[Bridge]", bridge, ...repeatBlock);
+  }
+
+  return lines.join("\n");
+}
+
+export function buildHebrewLyrics(order: OrderContent, songSeconds = 20) {
   const subject = subjectForLyrics(order);
   const hook = occasionHook(order);
   const detail = storyLyricLine(order);
   const include = mustIncludeLine(order);
   const isFemale = order.recipientGender === "female";
+  const elaboration = secondSentence(order.story) || "הרגעים האלה נשארים בלב לתמיד";
+  const bridge = "עוד שיר, עוד רגע, עוד סיבה לחייך";
 
   if (order.songType === "business") {
-    return [
-      "[Hook]",
-      `${subject}, ${hook}`,
-      include || "קל לזכור, נעים לשמוע",
-      "[Verse]",
-      `${detail}`,
-      "[Hook]",
-      `${subject}, ${hook}`,
-    ].join("\n");
+    const hookBlock = ["[Hook]", `${subject}, ${hook}`, include || "קל לזכור, נעים לשמוע"];
+
+    return extendForLength([...hookBlock, "[Verse]", `${detail}`, ...hookBlock], hookBlock, songSeconds, elaboration, bridge);
   }
 
   if (order.songType === "graduation") {
-    return [
-      "[Verse]",
-      `${hook}, כולנו כאן ביחד`,
-      `${detail}`,
-      "[Chorus]",
-      include || "כל צעד קטן הפך לזיכרון",
-      "שרים בקול, עם לב גדול",
-      `${subject}, היום הזה שלנו`,
-    ].join("\n");
+    const chorusBlock = ["[Chorus]", include || "כל צעד קטן הפך לזיכרון", "שרים בקול, עם לב גדול", `${subject}, היום הזה שלנו`];
+
+    return extendForLength(
+      ["[Verse]", `${hook}, כולנו כאן ביחד`, `${detail}`, ...chorusBlock],
+      chorusBlock,
+      songSeconds,
+      elaboration,
+      bridge,
+    );
   }
 
   if (order.lyricStructure === "פזמון פתיחה ישר לעניין") {
-    return [
-      "[Chorus]",
-      `${hook} ${subject}`,
-      include || (isFemale ? "הלב שלנו שר אלייך" : "הלב שלנו שר אליך"),
-      "[Verse]",
-      `${detail}`,
-      "[Chorus]",
-      `${hook} ${subject}`,
-    ].join("\n");
+    const chorusBlock = ["[Chorus]", `${hook} ${subject}`, include || (isFemale ? "הלב שלנו שר אלייך" : "הלב שלנו שר אליך")];
+
+    return extendForLength([...chorusBlock, "[Verse]", `${detail}`, ...chorusBlock], chorusBlock, songSeconds, elaboration, bridge);
   }
 
   if (order.lyricStructure === "ברכה אישית מרגשת") {
-    return [
-      "[Verse]",
-      isFemale ? `${subject}, היום חושבים עלייך` : `${subject}, היום חושבים עליך`,
-      `${detail}`,
+    const chorusBlock = [
       "[Chorus]",
       include || (isFemale ? "שיאיר עלייך אור בכל הדרך" : "שיאיר עליך אור בכל הדרך"),
       `${hook} מכל הלב`,
       isFemale ? "השיר הזה שר אלייך" : "השיר הזה שר אליך",
-    ].join("\n");
+    ];
+
+    return extendForLength(
+      [
+        "[Verse]",
+        isFemale ? `${subject}, היום חושבים עלייך` : `${subject}, היום חושבים עליך`,
+        `${detail}`,
+        ...chorusBlock,
+      ],
+      chorusBlock,
+      songSeconds,
+      elaboration,
+      bridge,
+    );
   }
 
-  return [
-    "[Verse]",
-    isFemale ? `${subject}, היום הזה זורח עלייך` : `${subject}, היום הזה זורח עליך`,
-    `${detail}`,
+  const chorusBlock = [
     "[Chorus]",
     include || `${hook}, שרים מכל הלב`,
     "רגע קטן הופך לשיר",
     isFemale ? `${subject}, תמיד תזכרי את היום הזה` : `${subject}, תמיד תזכור את היום הזה`,
-  ].join("\n");
+  ];
+
+  return extendForLength(
+    ["[Verse]", isFemale ? `${subject}, היום הזה זורח עלייך` : `${subject}, היום הזה זורח עליך`, `${detail}`, ...chorusBlock],
+    chorusBlock,
+    songSeconds,
+    elaboration,
+    bridge,
+  );
 }
 
 type NakdanToken = {
@@ -555,7 +607,7 @@ export async function createSongVersion(order: OrderContent, songSeconds: number
     `https://api.elevenlabs.io/v1/music/stream?output_format=${encodeURIComponent(outputFormat)}`;
   const musicLengthMs = songSeconds * 1000;
   const modelId = process.env.ELEVENLABS_MUSIC_MODEL_ID || "music_v2";
-  const lyrics = buildHebrewLyrics(order);
+  const lyrics = buildHebrewLyrics(order, songSeconds);
   const positiveStyles = [
     directionFor(styleDirections, order.style),
     directionFor(moodDirections, order.mood),

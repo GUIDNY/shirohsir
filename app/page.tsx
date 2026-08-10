@@ -429,6 +429,7 @@ export default function Home() {
         mustInclude: order.mustInclude,
         avoid: order.avoid,
         recipientGender: order.recipientGender,
+        songLengthSeconds: order.songLengthSeconds,
       }),
     })
       .then((response) => (response.ok ? response.json() : Promise.reject(response)))
@@ -460,6 +461,7 @@ export default function Home() {
     order.mustInclude,
     order.avoid,
     order.recipientGender,
+    order.songLengthSeconds,
   ]);
   const completion = useMemo(() => {
     const required = [order.recipient, resolveOccasion(order), order.story, order.customerName, order.email, order.phone];
