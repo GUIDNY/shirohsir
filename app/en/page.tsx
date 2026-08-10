@@ -45,7 +45,7 @@ export default function EnglishPage() {
       <header className="legal-topbar">
         <Link className="brand" href="/en">
           <span className="brand-mark">
-            <img src="/logo.svg" alt="" />
+            <img src="/logo.png" alt="" />
           </span>
           <span>Shirli</span>
         </Link>

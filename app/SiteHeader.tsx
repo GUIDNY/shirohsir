@@ -30,7 +30,7 @@ export function SiteHeader({
       <div className="topbar-start">
         <Link className="brand" href={homeHref} aria-label="Shirli">
           <span className="brand-mark">
-            <img src="/logo.svg" alt="" />
+            <img src="/logo.png" alt="" />
           </span>
           <span className="font-wordmark" dir="ltr">
             Shirli
