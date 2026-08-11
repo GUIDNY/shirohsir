@@ -255,6 +255,10 @@ export async function POST(request: NextRequest) {
       }
 
       if (generationError instanceof MusicProviderError) {
+        console.error(
+          `[ORDER_GENERATION_FAILED] orderId=${orderId} user=${user.id} providerStatus=${generationError.providerStatus} providerMessage=${generationError.providerMessage}`,
+        );
+
         return NextResponse.json(
           { error: "תקלה זמנית בהפקת השיר — הקרדיטים הוחזרו לחשבון שלך. אפשר לנסות שוב.", refunded: true },
           { status: 502 },
@@ -304,6 +308,8 @@ export async function POST(request: NextRequest) {
     } satisfies OrderResponse);
   } catch (error) {
     if (error instanceof MusicProviderError) {
+      console.error(`[ORDER_GENERATION_FAILED] mode=${mode} user=${user.id} providerStatus=${error.providerStatus} providerMessage=${error.providerMessage}`);
+
       return NextResponse.json(
         {
           error: error.message,
@@ -313,6 +319,8 @@ export async function POST(request: NextRequest) {
         { status: 502 },
       );
     }
+
+    console.error(`[ORDER_REQUEST_FAILED] mode=${mode} user=${user.id}`, error);
 
     const message = error instanceof Error ? error.message : "Unknown server error";
 

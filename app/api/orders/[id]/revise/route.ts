@@ -135,11 +135,15 @@ export async function POST(request: NextRequest, ctx: RouteContext<"/api/orders/
     }
 
     if (error instanceof MusicProviderError) {
+      console.error(`[REVISE_FAILED] orderId=${orderId} user=${user.id} providerStatus=${error.providerStatus} providerMessage=${error.providerMessage}`);
+
       return NextResponse.json(
         { error: "תקלה זמנית בביצוע השינוי — הקרדיטים הוחזרו לחשבון שלך.", refunded: true },
         { status: 502 },
       );
     }
+
+    console.error(`[REVISE_FAILED] orderId=${orderId} user=${user.id}`, error);
 
     return NextResponse.json({ error: "שגיאה בביצוע השינוי" }, { status: 500 });
   }

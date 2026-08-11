@@ -123,11 +123,15 @@ export async function POST(request: NextRequest, ctx: RouteContext<"/api/orders/
     }
 
     if (error instanceof MusicProviderError) {
+      console.error(`[EXTRA_VERSION_FAILED] orderId=${orderId} user=${user.id} providerStatus=${error.providerStatus} providerMessage=${error.providerMessage}`);
+
       return NextResponse.json(
         { error: "תקלה זמנית ביצירת הגרסה — הקרדיטים הוחזרו לחשבון שלך.", refunded: true },
         { status: 502 },
       );
     }
+
+    console.error(`[EXTRA_VERSION_FAILED] orderId=${orderId} user=${user.id}`, error);
 
     return NextResponse.json({ error: "שגיאה ביצירת הגרסה הנוספת" }, { status: 500 });
   }

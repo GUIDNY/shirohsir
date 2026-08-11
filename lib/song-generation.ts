@@ -933,6 +933,15 @@ export async function createSongVersion(order: OrderContent, songSeconds: number
   if (!providerResponse.ok) {
     const providerError = await providerResponse.text();
 
+    // Was previously thrown with no server-side trace at all — a real
+    // production failure left nothing to diagnose (Vercel log entry had
+    // zero attached logs). audioReference is logged explicitly since
+    // that's the newest, least-verified code path (conditioning_ref
+    // requires an ElevenLabs paid plan we can't check from code).
+    console.error(
+      `[ELEVENLABS_MUSIC_FAILED] version=${versionLabel} status=${providerResponse.status} audioReference=${order.audioReference ? `song_id=${order.audioReference.songId} strength=${order.audioReference.conditionStrength}` : "none"} body=${providerError.slice(0, 800)}`,
+    );
+
     throw new MusicProviderError(providerResponse.status, providerError.slice(0, 500));
   }
 
