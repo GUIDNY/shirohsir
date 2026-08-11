@@ -1049,7 +1049,18 @@ export default function Home() {
                 </div>
               </div>
 
-              <button className="primary-button" onClick={() => setDecisionMade(true)} type="button">
+              <button
+                className="primary-button"
+                onClick={() => {
+                  setDecisionMade(true);
+                  // Customers who already have their own lyrics don't need
+                  // the "type of song" screen (it only mattered for how
+                  // Shirli would write lyrics from scratch) — skip straight
+                  // to the lyrics/melody step.
+                  setStep(order.lyricsMode === "custom" ? 1 : 0);
+                }}
+                type="button"
+              >
                 בואו נתחיל
                 <ArrowLeft size={18} />
               </button>
@@ -1057,17 +1068,29 @@ export default function Home() {
           ) : (
             <>
           <div className="steps" aria-label="התקדמות ביצירת השיר">
-            {["סוג שיר", order.lyricsMode === "custom" ? "המילים" : "הסיפור", "אימות", "סיכום"].map((label, index, all) => (
+            {(order.lyricsMode === "custom"
+              ? [
+                  { index: 1, label: "המילים" },
+                  { index: 2, label: "אימות" },
+                  { index: 3, label: "סיכום" },
+                ]
+              : [
+                  { index: 0, label: "סוג שיר" },
+                  { index: 1, label: "הסיפור" },
+                  { index: 2, label: "אימות" },
+                  { index: 3, label: "סיכום" },
+                ]
+            ).map(({ index, label }, position, all) => (
               <Fragment key={label}>
                 <button
                   className={step === index ? "active" : step > index ? "done" : ""}
                   type="button"
                   onClick={() => setStep(index)}
                 >
-                  <span className="step-badge">{step > index ? <CheckSmall size={13} /> : index + 1}</span>
+                  <span className="step-badge">{step > index ? <CheckSmall size={13} /> : position + 1}</span>
                   <span className="step-label">{label}</span>
                 </button>
-                {index < all.length - 1 && <span className="step-connector" aria-hidden="true" />}
+                {position < all.length - 1 && <span className="step-connector" aria-hidden="true" />}
               </Fragment>
             ))}
           </div>
@@ -1386,7 +1409,11 @@ export default function Home() {
               )}
 
               <div className="form-footer">
-                <button className="ghost-button" type="button" onClick={() => setStep(0)}>
+                <button
+                  className="ghost-button"
+                  onClick={() => (order.lyricsMode === "custom" ? setDecisionMade(false) : setStep(0))}
+                  type="button"
+                >
                   חזרה
                 </button>
                 <button className="primary-button" type="button" onClick={() => setStep(2)}>
