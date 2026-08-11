@@ -1105,26 +1105,17 @@ export default function Home() {
 
               <div className="chip-field">
                 <span className="story-field-label">איזה רגע הופכים לשיר?</span>
-                <div className="type-grid type-grid--compact">
+                <div className="occasion-chips">
                   {songTypes.map((type) => (
-                    <label className={order.songType === type.id ? "type-card selected" : "type-card"} key={type.id}>
-                      <input
-                        checked={order.songType === type.id}
-                        name="songType"
-                        onChange={() => setField("songType", type.id)}
-                        type="radio"
-                      />
-                      {order.songType === type.id && (
-                        <span className="type-card-check">
-                          <CheckSmall size={13} />
-                        </span>
-                      )}
-                      <span className="type-card-icon">
-                        <type.icon size={22} />
-                      </span>
-                      <strong>{type.label}</strong>
-                      <span>{type.description}</span>
-                    </label>
+                    <button
+                      className={order.songType === type.id ? "occasion-chip selected" : "occasion-chip"}
+                      key={type.id}
+                      onClick={() => setField("songType", type.id)}
+                      type="button"
+                    >
+                      <type.icon size={15} />
+                      {type.label}
+                    </button>
                   ))}
                 </div>
               </div>

@@ -1517,11 +1517,6 @@ h3 {
   grid-template-columns: repeat(3, minmax(0, 1fr));
 }
 
-.type-grid--compact .type-card {
-  min-height: 108px;
-  padding: 16px 14px;
-}
-
 .type-card {
   position: relative;
   display: grid;
