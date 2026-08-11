@@ -837,23 +837,219 @@ export async function uploadAudioReference(fileBytes: Buffer, contentType: strin
   return { songId: data.song_id };
 }
 
+// ---- multi-chunk composition plans for songs over 2 minutes -------------
+//
+// ElevenLabs Music v2 rejects any single composition_plan chunk with
+// duration_ms above 120000 (2 min) — confirmed against the current API
+// docs and, painfully, against a real production 422. The 3-minute song
+// option (MAX_VERSION_SECONDS) needs >=2 chunks. Chunks in the SAME
+// composition_plan, sent in one request, are ElevenLabs' own intended
+// mechanism for a longer continuous song (context_adherence controls how
+// much a chunk follows its surrounding chunks) — this is not the same as
+// generating separate clips and concatenating them after the fact.
+
+const ELEVENLABS_MIN_CHUNK_MS = 3000;
+const ELEVENLABS_MAX_CHUNK_MS = 120000;
+const ELEVENLABS_MAX_CHUNKS = 30;
+
+export function chunkCountFor(totalMs: number) {
+  return Math.max(1, Math.ceil(totalMs / ELEVENLABS_MAX_CHUNK_MS));
+}
+
+// Splits already-tagged lyrics ("[Verse]\nline\n[Chorus]\nline...") into
+// ordered blocks, each starting at its [Tag] line. Untagged text (e.g. a
+// customer's freeform pasted lyrics with no section markers) comes back
+// as a single block.
+function splitLyricsIntoSections(lyrics: string): string[][] {
+  const lines = lyrics.split("\n");
+  const sections: string[][] = [];
+  let current: string[] = [];
+
+  for (const line of lines) {
+    if (/^\[[^\]]+\]$/.test(line.trim()) && current.length > 0) {
+      sections.push(current);
+      current = [line];
+    } else {
+      current.push(line);
+    }
+  }
+
+  if (current.length > 0) {
+    sections.push(current);
+  }
+
+  return sections;
+}
+
+function evenLineSplit(lyrics: string, chunkCount: number): string[] {
+  const lines = lyrics.split("\n");
+  const perChunk = Math.max(1, Math.ceil(lines.length / chunkCount));
+
+  return Array.from({ length: chunkCount }, (_, index) => lines.slice(index * perChunk, (index + 1) * perChunk).join("\n"));
+}
+
+// Groups the lyrics' own [Verse]/[Chorus]/[Bridge] sections into exactly
+// `chunkCount` chunk texts, in order, never splitting a section or
+// reordering content — only deciding where the chunk boundary falls.
+// A section is never moved into the current chunk if doing so would push
+// that chunk over its proportional share of the total lines (so, in
+// practice, a chunk boundary lands between sections, not mid-verse).
+// Falls back to an even line split when there aren't enough tagged
+// sections to fill every chunk (untagged custom lyrics, a very short
+// song, etc.) — see the validation step below for the final safety net.
+export function groupLyricsIntoChunkTexts(lyrics: string, chunkCount: number): string[] {
+  if (chunkCount <= 1) {
+    return [lyrics];
+  }
+
+  const sections = splitLyricsIntoSections(lyrics);
+
+  if (sections.length < chunkCount) {
+    return evenLineSplit(lyrics, chunkCount);
+  }
+
+  const totalLines = sections.reduce((sum, section) => sum + section.length, 0);
+  const cumulativeTargets = Array.from({ length: chunkCount }, (_, index) => (totalLines * (index + 1)) / chunkCount);
+  const buckets: string[][] = Array.from({ length: chunkCount }, () => []);
+  let bucketIndex = 0;
+  let linesSoFar = 0;
+
+  for (const section of sections) {
+    const wouldOvershoot = linesSoFar + section.length > cumulativeTargets[bucketIndex];
+
+    if (wouldOvershoot && bucketIndex < chunkCount - 1 && buckets[bucketIndex].length > 0) {
+      bucketIndex += 1;
+    }
+
+    buckets[bucketIndex].push(...section);
+    linesSoFar += section.length;
+  }
+
+  if (buckets.some((bucket) => bucket.length === 0)) {
+    return evenLineSplit(lyrics, chunkCount);
+  }
+
+  return buckets.map((bucket) => bucket.join("\n"));
+}
+
+// Splits totalMs across chunkTexts proportional to each chunk's actual
+// share of the lyrics (a chunk with more lines to sing gets more time),
+// then clamps every entry inside ElevenLabs' bounds — clamping can make
+// the sum drift a little from totalMs, which is an acceptable tradeoff
+// for "every chunk is guaranteed valid" (checked again in
+// validateCompositionChunks below regardless).
+export function allocateChunkDurations(totalMs: number, chunkTexts: string[]): number[] {
+  const weights = chunkTexts.map((chunkText) => Math.max(chunkText.split("\n").filter((line) => line.trim()).length, 1));
+  const totalWeight = weights.reduce((sum, weight) => sum + weight, 0);
+  const durations = weights.map((weight) => Math.round((weight / totalWeight) * totalMs));
+
+  const drift = totalMs - durations.reduce((sum, duration) => sum + duration, 0);
+  durations[durations.length - 1] += drift;
+
+  return durations.map((duration) => Math.min(Math.max(duration, ELEVENLABS_MIN_CHUNK_MS), ELEVENLABS_MAX_CHUNK_MS));
+}
+
+type CompositionChunk = {
+  text: string;
+  duration_ms: number;
+  positive_styles: string[];
+  negative_styles: string[];
+  context_adherence: "high";
+  conditioning_ref?: { song_id: string; range: { start_ms: number; end_ms: number } };
+  condition_strength?: ConditionStrength;
+};
+
+// Builds a composition_plan.chunks array covering the full requested
+// duration, splitting into multiple chunks only when the total exceeds
+// ElevenLabs' 120s-per-chunk cap. The SAME style directives and (if
+// present) the SAME audio reference are applied to every chunk — that's
+// what keeps a multi-chunk song sounding like one continuous piece
+// instead of restarting stylistically at each chunk boundary, and (per
+// the original melody-feature spec) keeps the reference influencing the
+// full composition, not just its first section.
+export function buildCompositionChunks(
+  vocalizedLyrics: string,
+  totalMs: number,
+  positiveStyles: string[],
+  negativeStyles: string[],
+  audioReference: AudioReference | undefined,
+): CompositionChunk[] {
+  const chunkCount = chunkCountFor(totalMs);
+  const chunkTexts = groupLyricsIntoChunkTexts(vocalizedLyrics, chunkCount).filter((chunkText) => chunkText.trim().length > 0);
+  const durations = allocateChunkDurations(totalMs, chunkTexts);
+
+  const conditioningRef = audioReference
+    ? {
+        conditioning_ref: {
+          song_id: audioReference.songId,
+          range: { start_ms: 0, end_ms: AUDIO_REFERENCE_RANGE_MS },
+        },
+        condition_strength: audioReference.conditionStrength,
+      }
+    : {};
+
+  return chunkTexts.map((chunkText, index) => ({
+    text: chunkText,
+    duration_ms: durations[index],
+    positive_styles: positiveStyles,
+    negative_styles: negativeStyles,
+    context_adherence: "high" as const,
+    ...conditioningRef,
+  }));
+}
+
+// Last line of defense before spending an ElevenLabs API call (and the
+// customer's credits already having been charged) on a plan we can tell
+// in advance is invalid — e.g. a bug in the chunking logic above rather
+// than anything ElevenLabs itself would reject. Throws MusicProviderError
+// (not a bare Error) so it flows through the exact same refund path as a
+// real provider rejection — from the customer's side, "we built a bad
+// request" and "ElevenLabs rejected our request" should both mean
+// "refunded, try again," never "silently charged for nothing."
+export function validateCompositionChunks(chunks: CompositionChunk[], totalMs: number, versionLabel: string) {
+  const problems: string[] = [];
+
+  if (chunks.length === 0) {
+    problems.push("no chunks produced");
+  }
+
+  if (chunks.length > ELEVENLABS_MAX_CHUNKS) {
+    problems.push(`${chunks.length} chunks exceeds ElevenLabs' ${ELEVENLABS_MAX_CHUNKS}-chunk limit`);
+  }
+
+  chunks.forEach((chunk, index) => {
+    if (!chunk.text || !chunk.text.trim()) {
+      problems.push(`chunk[${index}] has empty text`);
+    }
+
+    if (chunk.duration_ms < ELEVENLABS_MIN_CHUNK_MS || chunk.duration_ms > ELEVENLABS_MAX_CHUNK_MS) {
+      problems.push(`chunk[${index}] duration_ms=${chunk.duration_ms} outside [${ELEVENLABS_MIN_CHUNK_MS}, ${ELEVENLABS_MAX_CHUNK_MS}]`);
+    }
+  });
+
+  const sumMs = chunks.reduce((sum, chunk) => sum + chunk.duration_ms, 0);
+
+  // Generous tolerance — clamping in allocateChunkDurations can
+  // legitimately drift the sum a little; this only catches a chunking
+  // logic bug that produced something wildly off, not normal rounding.
+  if (Math.abs(sumMs - totalMs) > ELEVENLABS_MAX_CHUNK_MS) {
+    problems.push(`chunk durations sum to ${sumMs}ms, far from the requested ${totalMs}ms`);
+  }
+
+  if (problems.length > 0) {
+    const message = `invalid composition plan: ${problems.join("; ")}`;
+    console.error(`[COMPOSITION_PLAN_INVALID] version=${versionLabel} ${message}`);
+    throw new MusicProviderError(0, message);
+  }
+}
+
 export async function createSongVersion(order: OrderContent, songSeconds: number, versionLabel: string): Promise<GeneratedVersion> {
   const apiKey = elevenLabsApiKey();
   const outputFormat = process.env.ELEVENLABS_OUTPUT_FORMAT || "mp3_44100_128";
   const apiUrl =
     process.env.ELEVENLABS_MUSIC_API_URL ||
     `https://api.elevenlabs.io/v1/music/stream?output_format=${encodeURIComponent(outputFormat)}`;
-  // ElevenLabs Music v2 rejects any single GenerationChunk.duration_ms
-  // above 120000 (2 min) — see /v1/music/compose validation error. We
-  // only ever send one chunk, so a request for the full 3-minute option
-  // (MAX_VERSION_SECONDS = 180) was failing outright (422) and refunding
-  // the customer's credits. Clamping here is a stopgap: it stops orders
-  // from failing, but a "3 minute" order now actually renders ~2
-  // minutes of audio. Properly honoring the full 3 minutes needs the
-  // composition_plan split across multiple chunks (ElevenLabs' intended
-  // pattern for longer songs) — a larger follow-up, not done here.
-  const ELEVENLABS_MAX_CHUNK_MS = 120000;
-  const musicLengthMs = Math.min(songSeconds * 1000, ELEVENLABS_MAX_CHUNK_MS);
+  const musicLengthMs = songSeconds * 1000;
   const modelId = process.env.ELEVENLABS_MUSIC_MODEL_ID || "music_v2";
   const lyrics = await getHebrewLyrics(order, songSeconds);
   const positiveStyles = [
@@ -902,20 +1098,20 @@ export async function createSongVersion(order: OrderContent, songSeconds: number
   // blocks or breaks song generation.
   const vocalizedLyrics = await addNiqqud(lyrics, order.recipientGender === "female");
 
-  // "יש לי מנגינה" — steers the generation's sound/production/tempo toward
-  // the customer's uploaded reference (see uploadAudioReference()). Applied
-  // to the one chunk from the start so it influences the whole composition,
-  // not just a section. ElevenLabs treats this as inspiration, not replay —
-  // it explicitly does not copy/remix the reference audio into the output.
-  const conditioningRef = order.audioReference
-    ? {
-        conditioning_ref: {
-          song_id: order.audioReference.songId,
-          range: { start_ms: 0, end_ms: AUDIO_REFERENCE_RANGE_MS },
-        },
-        condition_strength: order.audioReference.conditionStrength,
-      }
-    : {};
+  // "יש לי הקלטה להשראה" — steers the generation's sound/production/tempo
+  // toward the customer's uploaded reference (see uploadAudioReference()).
+  // Applied to every chunk (not just the first) so it influences the whole
+  // composition on multi-chunk songs too. ElevenLabs treats this as
+  // inspiration, not replay — it explicitly does not copy/remix the
+  // reference audio into the output.
+  const chunks = buildCompositionChunks(vocalizedLyrics, musicLengthMs, positiveStyles, negativeStyles, order.audioReference);
+
+  validateCompositionChunks(chunks, musicLengthMs, versionLabel);
+
+  const chunkDurationsMs = chunks.map((chunk) => chunk.duration_ms);
+  const audioReferenceLog = order.audioReference
+    ? `song_id=${order.audioReference.songId} strength=${order.audioReference.conditionStrength}`
+    : "none";
 
   const providerResponse = await fetch(apiUrl, {
     method: "POST",
@@ -924,18 +1120,7 @@ export async function createSongVersion(order: OrderContent, songSeconds: number
       "xi-api-key": apiKey,
     },
     body: JSON.stringify({
-      composition_plan: {
-        chunks: [
-          {
-            text: vocalizedLyrics,
-            duration_ms: musicLengthMs,
-            positive_styles: positiveStyles,
-            negative_styles: negativeStyles,
-            context_adherence: "high",
-            ...conditioningRef,
-          },
-        ],
-      },
+      composition_plan: { chunks },
       model_id: modelId,
     }),
   });
@@ -945,11 +1130,11 @@ export async function createSongVersion(order: OrderContent, songSeconds: number
 
     // Was previously thrown with no server-side trace at all — a real
     // production failure left nothing to diagnose (Vercel log entry had
-    // zero attached logs). audioReference is logged explicitly since
-    // that's the newest, least-verified code path (conditioning_ref
-    // requires an ElevenLabs paid plan we can't check from code).
+    // zero attached logs). Logs requested/actual duration and chunking so
+    // a future failure (e.g. a provider-side change to the chunk limit)
+    // is diagnosable without guessing from timing correlation again.
     console.error(
-      `[ELEVENLABS_MUSIC_FAILED] version=${versionLabel} status=${providerResponse.status} audioReference=${order.audioReference ? `song_id=${order.audioReference.songId} strength=${order.audioReference.conditionStrength}` : "none"} body=${providerError.slice(0, 800)}`,
+      `[ELEVENLABS_MUSIC_FAILED] version=${versionLabel} status=${providerResponse.status} requestedMs=${musicLengthMs} chunkDurationsMs=${JSON.stringify(chunkDurationsMs)} audioReference=${audioReferenceLog} body=${providerError.slice(0, 800)}`,
     );
 
     throw new MusicProviderError(providerResponse.status, providerError.slice(0, 500));
@@ -962,16 +1147,15 @@ export async function createSongVersion(order: OrderContent, songSeconds: number
   const base64 = arrayBufferToBase64(audioBuffer);
   void songId;
 
-  if (order.audioReference) {
-    // Confirms conditioning_ref actually reached ElevenLabs on a
-    // *successful* generation — success responses had no trace of this
-    // before, so there was no way to tell "the reference was sent but
-    // had a subtle effect" apart from "the reference silently wasn't
-    // sent at all".
-    console.info(
-      `[ELEVENLABS_MUSIC_SUCCESS] version=${versionLabel} audioReference=song_id=${order.audioReference.songId} strength=${order.audioReference.conditionStrength}`,
-    );
-  }
+  // Confirms — on a *successful* generation — how many chunks were sent,
+  // for how long, and whether the audio reference was included. Success
+  // responses had zero trace of any of this before, so there was no way
+  // to tell "the reference was sent but had a subtle effect" apart from
+  // "it silently wasn't sent," and no way to confirm chunking behaved as
+  // intended without a failure to correlate against.
+  console.info(
+    `[ELEVENLABS_MUSIC_SUCCESS] version=${versionLabel} requestedMs=${musicLengthMs} chunkDurationsMs=${JSON.stringify(chunkDurationsMs)} audioReference=${audioReferenceLog}`,
+  );
 
   return {
     label: versionLabel,

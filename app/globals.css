@@ -1894,6 +1894,15 @@ h3 {
   color: var(--bad);
 }
 
+.melody-disclaimer {
+  margin: 0;
+  padding-right: 10px;
+  border-right: 2px solid var(--cream-300);
+  color: var(--muted);
+  font-size: 0.82rem;
+  line-height: 1.6;
+}
+
 .melody-preview-card {
   display: grid;
   gap: 12px;

@@ -42,10 +42,11 @@ type OrderStatus = "idle" | "sending" | "ready" | "error";
 type LyricsMode = "auto" | "custom";
 
 // "תפתיעו אותי" (default) / "יש לי השראה" (free-text style reference) /
-// "יש לי מנגינה" (uploaded/recorded audio reference) — independent of
-// LyricsMode, since who writes the words and how the music is directed
-// are separate choices.
-type MusicMode = "auto" | "inspiration" | "melody";
+// "יש לי הקלטה להשראה" (uploaded/recorded audio reference — musical
+// inspiration only, never framed as melody preservation) — independent
+// of LyricsMode, since who writes the words and how the music is
+// directed are separate choices.
+type MusicMode = "auto" | "inspiration" | "reference";
 type MelodyUploadStatus = "idle" | "uploading" | "ready" | "error";
 
 type OrderPayload = {
@@ -199,9 +200,9 @@ function getMissingFieldInfo(order: OrderPayload): { label: string; step: number
     return { label: order.lyricsMode === "custom" ? "מילות השיר" : "הסיפור", step: 1 };
   }
 
-  if (order.musicMode === "melody") {
+  if (order.musicMode === "reference") {
     if (!order.melodySongId) {
-      return { label: "מנגינה", step: 1 };
+      return { label: "הקלטה", step: 1 };
     }
 
     if (!order.melodyRightsConfirmed) {
@@ -247,8 +248,8 @@ function buildConfirmationSummary(order: OrderPayload) {
     sentences.push(`נכין שיר בהשראת הסגנון של ${order.inspiration.trim()}.`);
   }
 
-  if (order.musicMode === "melody") {
-    sentences.push("שירלי תשתמש במנגינה שהעליתם כהשראה מוזיקלית חזקה ליצירת השיר.");
+  if (order.musicMode === "reference") {
+    sentences.push("שירלי תשתמש בהקלטה שהעליתם כהשראה לאווירה, לקצב ולסגנון של השיר — לא כשכפול של הלחן.");
   }
 
   return sentences.join(" ");
@@ -439,14 +440,14 @@ export default function Home() {
         const data = (await response.json().catch(() => null)) as { songId?: string; error?: string } | null;
 
         if (!response.ok || !data?.songId) {
-          throw new Error(data?.error || "שגיאה בהעלאת המנגינה");
+          throw new Error(data?.error || "שגיאה בהעלאת ההקלטה");
         }
 
         setOrder((current) => ({ ...current, melodySongId: data.songId as string }));
         setMelodyUploadStatus("ready");
       } catch (err) {
         setMelodyUploadStatus("error");
-        setMelodyError(err instanceof Error ? err.message : "שגיאה בהעלאת המנגינה");
+        setMelodyError(err instanceof Error ? err.message : "שגיאה בהעלאת ההקלטה");
       }
     },
     [account.session],
@@ -760,7 +761,7 @@ export default function Home() {
           moods: order.moods,
           musicMode: order.musicMode,
           inspiration: order.inspiration,
-          audioReference: order.musicMode === "melody" && order.melodySongId ? { songId: order.melodySongId, conditionStrength: "high" } : undefined,
+          audioReference: order.musicMode === "reference" && order.melodySongId ? { songId: order.melodySongId, conditionStrength: "high" } : undefined,
           melodyRightsConfirmed: order.melodyRightsConfirmed,
           story: order.story,
           mustInclude: order.mustInclude,
@@ -1199,11 +1200,11 @@ export default function Home() {
                     יש לי השראה
                   </button>
                   <button
-                    className={order.musicMode === "melody" ? "occasion-chip selected" : "occasion-chip"}
-                    onClick={() => setField("musicMode", "melody")}
+                    className={order.musicMode === "reference" ? "occasion-chip selected" : "occasion-chip"}
+                    onClick={() => setField("musicMode", "reference")}
                     type="button"
                   >
-                    יש לי מנגינה
+                    יש לי הקלטה להשראה
                   </button>
                 </div>
               </div>
@@ -1220,18 +1221,23 @@ export default function Home() {
                 </label>
               )}
 
-              {order.musicMode === "melody" && (
+              {order.musicMode === "reference" && (
                 <div className="story-field melody-field">
-                  <span className="story-field-label">יש לכם מנגינה משלכם?</span>
+                  <span className="story-field-label">יש לכם הקלטה שתשמש כהשראה?</span>
                   <span className="story-field-hint">
-                    הקליטו או העלו רעיון מוזיקלי משלכם, ושירלי תשתמש בו כדי ליצור סביבו שיר מלא.
+                    הקליטו או העלו קטע קצר — המהום, נגינה או כל רעיון מוזיקלי — ושירלי תשתמש בו כהשראה לאווירה, לקצב
+                    ולסגנון של השיר.
                   </span>
+                  <p className="melody-disclaimer">
+                    חשוב לדעת: זו לא שכפול מדויק של הלחן — ההקלטה משפיעה על האווירה, הקצב והסגנון של השיר החדש, לא
+                    מחליפה את הלחן המקורי.
+                  </p>
 
                   {!order.melodySongId && (
                     <div className="melody-upload-actions">
                       <button className="ghost-button" onClick={() => melodyFileInputRef.current?.click()} type="button">
                         <MusicNote size={16} />
-                        העלאת מנגינה
+                        העלאת הקלטה
                       </button>
                       <button
                         className={isRecordingMelody ? "ghost-button melody-recording" : "ghost-button"}
@@ -1239,7 +1245,7 @@ export default function Home() {
                         type="button"
                       >
                         <Mic size={16} />
-                        {isRecordingMelody ? `עצירת הקלטה (${recordingSeconds}s)` : "הקלטת מנגינה"}
+                        {isRecordingMelody ? `עצירת הקלטה (${recordingSeconds}s)` : "הקלטת קול"}
                       </button>
                       <input
                         accept="audio/*"
@@ -1253,7 +1259,7 @@ export default function Home() {
 
                   {melodyUploadStatus === "uploading" && (
                     <p className="lyrics-draft-preview-status">
-                      <Loader size={15} /> מעלים את המנגינה...
+                      <Loader size={15} /> מעלים את ההקלטה...
                     </p>
                   )}
 
@@ -1261,7 +1267,7 @@ export default function Home() {
 
                   {order.melodySongId && melodyUploadStatus === "ready" && (
                     <div className="melody-preview-card">
-                      <p className="melody-ready-label">המנגינה שלכם מוכנה ✨</p>
+                      <p className="melody-ready-label">ההקלטה שלכם מוכנה ✨</p>
                       {melodyPreviewUrl && <audio controls src={melodyPreviewUrl} />}
                       <div className="melody-preview-actions">
                         <button className="ghost-button" onClick={removeMelody} type="button">

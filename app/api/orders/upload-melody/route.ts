@@ -16,7 +16,7 @@ export async function POST(request: NextRequest) {
   const user = await getUserFromRequest(request);
 
   if (!user) {
-    return NextResponse.json({ error: "צריך להתחבר לפני העלאת מנגינה" }, { status: 401 });
+    return NextResponse.json({ error: "צריך להתחבר לפני העלאת הקלטה" }, { status: 401 });
   }
 
   const formData = await request.formData().catch(() => null);
@@ -40,18 +40,25 @@ export async function POST(request: NextRequest) {
 
   try {
     const bytes = Buffer.from(await file.arrayBuffer());
-    const { songId } = await elevenLabsProvider.uploadAudioReference(bytes, file.type, file.name || "melody");
+    const { songId } = await elevenLabsProvider.uploadAudioReference(bytes, file.type, file.name || "reference-audio");
+
+    // Confirms step 1 of the verification chain (part 3): the customer's
+    // audio was received and ElevenLabs accepted/stored it under this
+    // song_id. Only metadata — never the raw audio bytes or file name.
+    console.info(`[MELODY_UPLOAD_SUCCESS] user=${user.id} songId=${songId} contentType=${file.type} bytes=${file.size}`);
 
     return NextResponse.json({ songId });
   } catch (error) {
     if (error instanceof AudioReferenceUploadError) {
-      console.error(`[MELODY_UPLOAD_FAILED] status=${error.providerStatus} message=${error.providerMessage}`);
+      // Exact ElevenLabs response, so a plan/eligibility restriction (vs.
+      // a generic hiccup) is diagnosable from logs rather than guessed.
+      console.error(`[MELODY_UPLOAD_FAILED] user=${user.id} status=${error.providerStatus} message=${error.providerMessage}`);
 
-      return NextResponse.json({ error: "לא הצלחנו להעלות את המנגינה כרגע — אפשר לנסות שוב." }, { status: 502 });
+      return NextResponse.json({ error: "לא הצלחנו להעלות את ההקלטה כרגע — אפשר לנסות שוב." }, { status: 502 });
     }
 
-    console.error("[MELODY_UPLOAD_FAILED] unexpected", error instanceof Error ? error.message : error);
+    console.error(`[MELODY_UPLOAD_FAILED] user=${user.id} unexpected`, error instanceof Error ? error.message : error);
 
-    return NextResponse.json({ error: "שגיאה בהעלאת המנגינה" }, { status: 500 });
+    return NextResponse.json({ error: "שגיאה בהעלאת ההקלטה" }, { status: 500 });
   }
 }

@@ -17,7 +17,7 @@ import {
   uploadSongAudio,
 } from "@/lib/song-generation";
 
-type MusicMode = "auto" | "inspiration" | "melody";
+type MusicMode = "auto" | "inspiration" | "reference";
 
 type OrderPayload = OrderContent & {
   moods?: string[];
@@ -84,11 +84,11 @@ function orderInsertRow(
     avoid: text(order.avoid),
     lyrics_mode: customLyricsText(order.customLyrics) ? "custom" : "auto",
     custom_lyrics: customLyricsText(order.customLyrics),
-    music_mode: order.musicMode === "melody" || order.musicMode === "inspiration" ? order.musicMode : "auto",
+    music_mode: order.musicMode === "reference" || order.musicMode === "inspiration" ? order.musicMode : "auto",
     inspiration: text(order.inspiration),
-    melody_song_id: order.musicMode === "melody" ? text(order.audioReference?.songId) : "",
-    melody_condition_strength: order.musicMode === "melody" ? order.audioReference?.conditionStrength || "high" : "",
-    melody_rights_confirmed_at: order.musicMode === "melody" && order.melodyRightsConfirmed ? new Date().toISOString() : null,
+    melody_song_id: order.musicMode === "reference" ? text(order.audioReference?.songId) : "",
+    melody_condition_strength: order.musicMode === "reference" ? order.audioReference?.conditionStrength || "high" : "",
+    melody_rights_confirmed_at: order.musicMode === "reference" && order.melodyRightsConfirmed ? new Date().toISOString() : null,
     music_provider: "elevenlabs",
     music_model: process.env.ELEVENLABS_MUSIC_MODEL_ID || "music_v2",
     customer_name: text(order.customerName),
@@ -111,8 +111,8 @@ export async function POST(request: NextRequest) {
     missing.push("story");
   }
 
-  if (order.musicMode === "melody" && (!text(order.audioReference?.songId) || order.melodyRightsConfirmed !== true)) {
-    missing.push("melody");
+  if (order.musicMode === "reference" && (!text(order.audioReference?.songId) || order.melodyRightsConfirmed !== true)) {
+    missing.push("reference");
   }
 
   if (missing.length > 0 || order.consent !== true) {
@@ -146,7 +146,7 @@ export async function POST(request: NextRequest) {
     ...inferred,
     recipientGender: order.recipientGender === "female" ? "female" : "male",
     audioReference:
-      order.musicMode === "melody" && order.audioReference?.songId
+      order.musicMode === "reference" && order.audioReference?.songId
         ? { songId: order.audioReference.songId, conditionStrength: order.audioReference.conditionStrength || "high" }
         : undefined,
   };

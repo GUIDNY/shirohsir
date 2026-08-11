@@ -85,7 +85,7 @@ export async function POST(request: NextRequest, ctx: RouteContext<"/api/orders/
     customLyrics: order.custom_lyrics || "",
     inspiration: order.inspiration || "",
     audioReference:
-      order.music_mode === "melody" && order.melody_song_id
+      order.music_mode === "reference" && order.melody_song_id
         ? ({ songId: order.melody_song_id, conditionStrength: (order.melody_condition_strength || "high") as ConditionStrength } satisfies AudioReference)
         : undefined,
   };
