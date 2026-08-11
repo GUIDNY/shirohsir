@@ -843,7 +843,17 @@ export async function createSongVersion(order: OrderContent, songSeconds: number
   const apiUrl =
     process.env.ELEVENLABS_MUSIC_API_URL ||
     `https://api.elevenlabs.io/v1/music/stream?output_format=${encodeURIComponent(outputFormat)}`;
-  const musicLengthMs = songSeconds * 1000;
+  // ElevenLabs Music v2 rejects any single GenerationChunk.duration_ms
+  // above 120000 (2 min) — see /v1/music/compose validation error. We
+  // only ever send one chunk, so a request for the full 3-minute option
+  // (MAX_VERSION_SECONDS = 180) was failing outright (422) and refunding
+  // the customer's credits. Clamping here is a stopgap: it stops orders
+  // from failing, but a "3 minute" order now actually renders ~2
+  // minutes of audio. Properly honoring the full 3 minutes needs the
+  // composition_plan split across multiple chunks (ElevenLabs' intended
+  // pattern for longer songs) — a larger follow-up, not done here.
+  const ELEVENLABS_MAX_CHUNK_MS = 120000;
+  const musicLengthMs = Math.min(songSeconds * 1000, ELEVENLABS_MAX_CHUNK_MS);
   const modelId = process.env.ELEVENLABS_MUSIC_MODEL_ID || "music_v2";
   const lyrics = await getHebrewLyrics(order, songSeconds);
   const positiveStyles = [
@@ -951,6 +961,17 @@ export async function createSongVersion(order: OrderContent, songSeconds: number
   const songId = providerResponse.headers.get("song-id");
   const base64 = arrayBufferToBase64(audioBuffer);
   void songId;
+
+  if (order.audioReference) {
+    // Confirms conditioning_ref actually reached ElevenLabs on a
+    // *successful* generation — success responses had no trace of this
+    // before, so there was no way to tell "the reference was sent but
+    // had a subtle effect" apart from "the reference silently wasn't
+    // sent at all".
+    console.info(
+      `[ELEVENLABS_MUSIC_SUCCESS] version=${versionLabel} audioReference=song_id=${order.audioReference.songId} strength=${order.audioReference.conditionStrength}`,
+    );
+  }
 
   return {
     label: versionLabel,
