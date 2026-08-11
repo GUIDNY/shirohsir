@@ -1511,6 +1511,14 @@ export default function Home() {
                   <strong>{resolvedOccasion || "—"}</strong>
                 </div>
                 <div>
+                  <span>מילים</span>
+                  <strong>{order.lyricsMode === "custom" ? "המילים שלכם" : "נכתבו בעזרת שירלי"}</strong>
+                </div>
+                <div>
+                  <span>מנגינה</span>
+                  <strong>{order.musicMode === "reference" ? "ההקלטה שלכם" : "תיווצר על ידי שירלי"}</strong>
+                </div>
+                <div>
                   <span>מה מקבלים</span>
                   <strong>{orderMode === "demo" ? "דמו להאזנה באתר" : "שתי גרסאות"}</strong>
                 </div>
@@ -1527,6 +1535,28 @@ export default function Home() {
                   <strong>{orderMode === "demo" ? "חינם" : `${CREDITS_PER_SONG} קרדיטים`}</strong>
                 </div>
               </div>
+
+              {displayLyricsPreview && (
+                <div className="lyrics-draft-preview">
+                  <div className="lyrics-draft-preview-heading">
+                    <span className="story-field-label">מילות השיר</span>
+                    <button className="confirm-nudge-link" onClick={() => setStep(1)} type="button">
+                      עריכה
+                    </button>
+                  </div>
+                  <div className="lyrics-draft-preview-card">
+                    {displayLyricsPreview.split("\n").map((line, index) =>
+                      /^\[[^\]]+\]$/.test(line.trim()) ? (
+                        <span className="lyrics-draft-preview-tag" key={index}>
+                          {line.trim().replace(/[[\]]/g, "")}
+                        </span>
+                      ) : (
+                        <p key={index}>{line}</p>
+                      ),
+                    )}
+                  </div>
+                </div>
+              )}
 
               <label className="consent-row">
                 <input
