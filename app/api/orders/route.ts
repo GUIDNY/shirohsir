@@ -2,10 +2,11 @@ import { randomUUID } from "node:crypto";
 import { NextRequest, NextResponse } from "next/server";
 import { getUserFromRequest } from "@/lib/auth-user";
 import { isAdminUser } from "@/lib/is-admin";
+import { elevenLabsProvider } from "@/lib/music-providers/elevenlabs-provider";
 import { CREDITS_PER_SONG, FREE_DEMO, MAX_VERSION_SECONDS, SONG_LENGTH_OPTIONS } from "@/lib/pricing-catalog";
 import { createServerClient } from "@/lib/supabase-server";
 import {
-  createSongVersion,
+  ConditionStrength,
   customLyricsText,
   fetchElevenLabsQuota,
   GeneratedVersion,
@@ -16,9 +17,13 @@ import {
   uploadSongAudio,
 } from "@/lib/song-generation";
 
+type MusicMode = "auto" | "inspiration" | "melody";
+
 type OrderPayload = OrderContent & {
   moods?: string[];
-  inspiration?: string;
+  musicMode?: MusicMode;
+  audioReference?: { songId?: string; conditionStrength?: ConditionStrength };
+  melodyRightsConfirmed?: boolean;
   customerName?: string;
   email?: string;
   phone?: string;
@@ -79,6 +84,13 @@ function orderInsertRow(
     avoid: text(order.avoid),
     lyrics_mode: customLyricsText(order.customLyrics) ? "custom" : "auto",
     custom_lyrics: customLyricsText(order.customLyrics),
+    music_mode: order.musicMode === "melody" || order.musicMode === "inspiration" ? order.musicMode : "auto",
+    inspiration: text(order.inspiration),
+    melody_song_id: order.musicMode === "melody" ? text(order.audioReference?.songId) : "",
+    melody_condition_strength: order.musicMode === "melody" ? order.audioReference?.conditionStrength || "high" : "",
+    melody_rights_confirmed_at: order.musicMode === "melody" && order.melodyRightsConfirmed ? new Date().toISOString() : null,
+    music_provider: "elevenlabs",
+    music_model: process.env.ELEVENLABS_MUSIC_MODEL_ID || "music_v2",
     customer_name: text(order.customerName),
     customer_email: text(order.email),
     customer_phone: text(order.phone),
@@ -93,10 +105,14 @@ function orderInsertRow(
 
 export async function POST(request: NextRequest) {
   const order = (await request.json()) as OrderPayload;
-  const missing = requiredFields.filter((field) => !text(order[field]));
+  const missing: string[] = requiredFields.filter((field) => !text(order[field]));
 
   if (!text(order.story) && !customLyricsText(order.customLyrics)) {
     missing.push("story");
+  }
+
+  if (order.musicMode === "melody" && (!text(order.audioReference?.songId) || order.melodyRightsConfirmed !== true)) {
+    missing.push("melody");
   }
 
   if (missing.length > 0 || order.consent !== true) {
@@ -129,6 +145,10 @@ export async function POST(request: NextRequest) {
     ...order,
     ...inferred,
     recipientGender: order.recipientGender === "female" ? "female" : "male",
+    audioReference:
+      order.musicMode === "melody" && order.audioReference?.songId
+        ? { songId: order.audioReference.songId, conditionStrength: order.audioReference.conditionStrength || "high" }
+        : undefined,
   };
 
   try {
@@ -148,7 +168,7 @@ export async function POST(request: NextRequest) {
         }
       }
 
-      const version = await createSongVersion(enrichedOrder, FREE_DEMO.seconds, "דמו");
+      const version = await elevenLabsProvider.generateSong(enrichedOrder, FREE_DEMO.seconds, "דמו");
       const response: OrderResponse = {
         orderId: `demo_${Date.now()}`,
         mode: "demo",
@@ -220,8 +240,8 @@ export async function POST(request: NextRequest) {
     const versions: GeneratedVersion[] = [];
 
     try {
-      versions.push(await createSongVersion(enrichedOrder, songSeconds, "א"));
-      versions.push(await createSongVersion(enrichedOrder, songSeconds, "ב"));
+      versions.push(await elevenLabsProvider.generateSong(enrichedOrder, songSeconds, "א"));
+      versions.push(await elevenLabsProvider.generateSong(enrichedOrder, songSeconds, "ב"));
     } catch (generationError) {
       if (!admin) {
         await supabase.rpc("grant_credits", {

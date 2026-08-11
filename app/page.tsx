@@ -1,6 +1,6 @@
 "use client";
 
-import { Fragment, FormEvent, useCallback, useEffect, useMemo, useState } from "react";
+import { Fragment, FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import {
   AlertTriangle,
@@ -41,6 +41,13 @@ type OrderStatus = "idle" | "sending" | "ready" | "error";
 
 type LyricsMode = "auto" | "custom";
 
+// "תפתיעו אותי" (default) / "יש לי השראה" (free-text style reference) /
+// "יש לי מנגינה" (uploaded/recorded audio reference) — independent of
+// LyricsMode, since who writes the words and how the music is directed
+// are separate choices.
+type MusicMode = "auto" | "inspiration" | "melody";
+type MelodyUploadStatus = "idle" | "uploading" | "ready" | "error";
+
 type OrderPayload = {
   songType: SongType;
   recipient: string;
@@ -51,7 +58,13 @@ type OrderPayload = {
   mustInclude: string;
   customLyrics: string;
   moods: string[];
+  musicMode: MusicMode;
   inspiration: string;
+  // Set once /api/orders/upload-melody returns an ElevenLabs song_id —
+  // that id (not the raw audio) is what's sent with the order.
+  melodySongId: string | null;
+  melodyFileName: string;
+  melodyRightsConfirmed: boolean;
   avoid: string;
   customerName: string;
   email: string;
@@ -131,6 +144,10 @@ const initialOrder: OrderPayload = {
   mustInclude: "",
   customLyrics: "",
   moods: [],
+  musicMode: "auto",
+  melodySongId: null,
+  melodyFileName: "",
+  melodyRightsConfirmed: false,
   inspiration: "",
   avoid: "",
   customerName: "",
@@ -182,6 +199,16 @@ function getMissingFieldInfo(order: OrderPayload): { label: string; step: number
     return { label: order.lyricsMode === "custom" ? "מילות השיר" : "הסיפור", step: 1 };
   }
 
+  if (order.musicMode === "melody") {
+    if (!order.melodySongId) {
+      return { label: "מנגינה", step: 1 };
+    }
+
+    if (!order.melodyRightsConfirmed) {
+      return { label: "אישור זכויות על ההקלטה", step: 1 };
+    }
+  }
+
   if (!order.customerName.trim()) {
     return { label: "השם שלך", step: 3 };
   }
@@ -207,15 +234,21 @@ function buildConfirmationSummary(order: OrderPayload) {
       : "קראנו את הסיפור ששיתפתם ונשלב אותו במילות השיר.",
   ];
 
+  const useInspiration = order.musicMode === "inspiration" && order.inspiration.trim();
+
   if (order.moods.length > 0) {
     const moodsText = order.moods.join(" ו");
     sentences.push(
-      order.inspiration.trim()
+      useInspiration
         ? `נכין שיר שמרגיש ${moodsText}, בהשראת הסגנון של ${order.inspiration.trim()}.`
         : `נכין שיר שמרגיש ${moodsText}.`,
     );
-  } else if (order.inspiration.trim()) {
+  } else if (useInspiration) {
     sentences.push(`נכין שיר בהשראת הסגנון של ${order.inspiration.trim()}.`);
+  }
+
+  if (order.musicMode === "melody") {
+    sentences.push("שירלי תשתמש במנגינה שהעליתם כהשראה מוזיקלית חזקה ליצירת השיר.");
   }
 
   return sentences.join(" ");
@@ -316,6 +349,15 @@ export default function Home() {
   const [providerQuotaStatus, setProviderQuotaStatus] = useState<"loading" | "ready" | "error">("loading");
   const [lyricsPreview, setLyricsPreview] = useState<string | null>(null);
   const [lyricsPreviewError, setLyricsPreviewError] = useState(false);
+  const [melodyUploadStatus, setMelodyUploadStatus] = useState<MelodyUploadStatus>("idle");
+  const [melodyError, setMelodyError] = useState<string | null>(null);
+  const [melodyPreviewUrl, setMelodyPreviewUrl] = useState<string | null>(null);
+  const [isRecordingMelody, setIsRecordingMelody] = useState(false);
+  const [recordingSeconds, setRecordingSeconds] = useState(0);
+  const melodyFileInputRef = useRef<HTMLInputElement | null>(null);
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const recordedChunksRef = useRef<Blob[]>([]);
+  const recordingTimerRef = useRef<number | null>(null);
   const isAdmin = account.credits?.isAdmin === true;
   const isLiveProviderQuota = providerQuotaStatus === "ready" && providerQuota?.mode === "live";
   const accessToken = account.session?.access_token;
@@ -327,6 +369,22 @@ export default function Home() {
     document.getElementById(id)?.scrollIntoView({ behavior: "smooth", block: "start" });
   };
 
+  const clearMelody = useCallback(() => {
+    setMelodyPreviewUrl((current) => {
+      if (current) {
+        URL.revokeObjectURL(current);
+      }
+
+      return null;
+    });
+    setMelodyUploadStatus("idle");
+    setMelodyError(null);
+
+    if (melodyFileInputRef.current) {
+      melodyFileInputRef.current.value = "";
+    }
+  }, []);
+
   const startNewOrder = useCallback(() => {
     setOrder(initialOrder);
     setStep(0);
@@ -336,7 +394,142 @@ export default function Home() {
     setOrderMode("full");
     setAdvancedOpen(false);
     setIdempotencyKey(crypto.randomUUID());
+    clearMelody();
+  }, [clearMelody]);
+
+  // Revoke the object URL used for melody preview playback on unmount
+  // so it doesn't leak.
+  useEffect(() => {
+    return () => {
+      if (melodyPreviewUrl) {
+        URL.revokeObjectURL(melodyPreviewUrl);
+      }
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  const uploadMelodyFile = useCallback(
+    async (blob: Blob, fileName: string) => {
+      if (!account.session) {
+        promptSignIn();
+        return;
+      }
+
+      setMelodyPreviewUrl((current) => {
+        if (current) {
+          URL.revokeObjectURL(current);
+        }
+
+        return URL.createObjectURL(blob);
+      });
+      setOrder((current) => ({ ...current, melodyFileName: fileName, melodySongId: null, melodyRightsConfirmed: false }));
+      setMelodyUploadStatus("uploading");
+      setMelodyError(null);
+
+      try {
+        const formData = new FormData();
+        formData.append("file", blob, fileName);
+
+        const response = await fetch("/api/orders/upload-melody", {
+          method: "POST",
+          headers: { Authorization: `Bearer ${account.session.access_token}` },
+          body: formData,
+        });
+
+        const data = (await response.json().catch(() => null)) as { songId?: string; error?: string } | null;
+
+        if (!response.ok || !data?.songId) {
+          throw new Error(data?.error || "שגיאה בהעלאת המנגינה");
+        }
+
+        setOrder((current) => ({ ...current, melodySongId: data.songId as string }));
+        setMelodyUploadStatus("ready");
+      } catch (err) {
+        setMelodyUploadStatus("error");
+        setMelodyError(err instanceof Error ? err.message : "שגיאה בהעלאת המנגינה");
+      }
+    },
+    [account.session],
+  );
+
+  const handleMelodyFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    // Reset so picking the exact same file again after a failed upload
+    // still fires a change event — browsers don't fire one when an
+    // <input type="file"> is set to the same value it already has.
+    event.target.value = "";
+
+    if (file) {
+      void uploadMelodyFile(file, file.name);
+    }
+  };
+
+  // Auto-stops well past ElevenLabs' ~30s reference guidance so a
+  // customer can't accidentally record an oversized file.
+  const MAX_RECORDING_SECONDS = 40;
+
+  const stopRecordingMelody = useCallback(() => {
+    mediaRecorderRef.current?.stop();
+    setIsRecordingMelody(false);
+
+    if (recordingTimerRef.current) {
+      window.clearInterval(recordingTimerRef.current);
+      recordingTimerRef.current = null;
+    }
+  }, []);
+
+  const startRecordingMelody = async () => {
+    if (!account.session) {
+      promptSignIn();
+      return;
+    }
+
+    setMelodyError(null);
+
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const mimeType = typeof MediaRecorder.isTypeSupported === "function" && MediaRecorder.isTypeSupported("audio/webm")
+        ? "audio/webm"
+        : "";
+      const recorder = mimeType ? new MediaRecorder(stream, { mimeType }) : new MediaRecorder(stream);
+
+      recordedChunksRef.current = [];
+
+      recorder.ondataavailable = (event) => {
+        if (event.data.size > 0) {
+          recordedChunksRef.current.push(event.data);
+        }
+      };
+
+      recorder.onstop = () => {
+        stream.getTracks().forEach((track) => track.stop());
+        const blob = new Blob(recordedChunksRef.current, { type: recorder.mimeType || "audio/webm" });
+        void uploadMelodyFile(blob, `הקלטה-${Date.now()}.webm`);
+      };
+
+      mediaRecorderRef.current = recorder;
+      recorder.start();
+      setIsRecordingMelody(true);
+      setRecordingSeconds(0);
+
+      recordingTimerRef.current = window.setInterval(() => {
+        setRecordingSeconds((seconds) => {
+          if (seconds + 1 >= MAX_RECORDING_SECONDS) {
+            stopRecordingMelody();
+          }
+
+          return seconds + 1;
+        });
+      }, 1000);
+    } catch {
+      setMelodyError("לא הצלחנו לגשת למיקרופון — אפשר להעלות קובץ במקום.");
+    }
+  };
+
+  const removeMelody = () => {
+    clearMelody();
+    setOrder((current) => ({ ...current, melodySongId: null, melodyFileName: "", melodyRightsConfirmed: false }));
+  };
 
   const handleSelectPlan = (plan: PricingPlan) => {
     if (!account.session) {
@@ -565,7 +758,10 @@ export default function Home() {
           recipient: order.recipient,
           occasion: resolveOccasion(order),
           moods: order.moods,
+          musicMode: order.musicMode,
           inspiration: order.inspiration,
+          audioReference: order.musicMode === "melody" && order.melodySongId ? { songId: order.melodySongId, conditionStrength: "high" } : undefined,
+          melodyRightsConfirmed: order.melodyRightsConfirmed,
           story: order.story,
           mustInclude: order.mustInclude,
           customLyrics: order.customLyrics,
@@ -985,16 +1181,106 @@ export default function Home() {
                 </div>
               </div>
 
-              <label className="story-field">
-                <span className="story-field-label">
-                  יש זמר או שיר שאתם אוהבים? <span className="story-field-optional">אופציונלי</span>
-                </span>
-                <input
-                  onChange={(event) => setField("inspiration", event.target.value)}
-                  placeholder="לדוגמה: עומר אדם, אושר כהן, פופ ישראלי..."
-                  value={order.inspiration}
-                />
-              </label>
+              <div className="chip-field">
+                <span className="story-field-label">איך רוצים לגשת למוזיקה של השיר?</span>
+                <div className="occasion-chips">
+                  <button
+                    className={order.musicMode === "auto" ? "occasion-chip selected" : "occasion-chip"}
+                    onClick={() => setField("musicMode", "auto")}
+                    type="button"
+                  >
+                    תפתיעו אותי
+                  </button>
+                  <button
+                    className={order.musicMode === "inspiration" ? "occasion-chip selected" : "occasion-chip"}
+                    onClick={() => setField("musicMode", "inspiration")}
+                    type="button"
+                  >
+                    יש לי השראה
+                  </button>
+                  <button
+                    className={order.musicMode === "melody" ? "occasion-chip selected" : "occasion-chip"}
+                    onClick={() => setField("musicMode", "melody")}
+                    type="button"
+                  >
+                    יש לי מנגינה
+                  </button>
+                </div>
+              </div>
+
+              {order.musicMode === "inspiration" && (
+                <label className="story-field">
+                  <span className="story-field-label">יש זמר או שיר שאתם אוהבים?</span>
+                  <input
+                    onChange={(event) => setField("inspiration", event.target.value)}
+                    placeholder="לדוגמה: עומר אדם, אושר כהן, פופ ישראלי..."
+                    value={order.inspiration}
+                  />
+                  <span className="story-field-hint">נשתמש בזה כהשראה כללית לסגנון — לא כשכפול של שיר קיים.</span>
+                </label>
+              )}
+
+              {order.musicMode === "melody" && (
+                <div className="story-field melody-field">
+                  <span className="story-field-label">יש לכם מנגינה משלכם?</span>
+                  <span className="story-field-hint">
+                    הקליטו או העלו רעיון מוזיקלי משלכם, ושירלי תשתמש בו כדי ליצור סביבו שיר מלא.
+                  </span>
+
+                  {!order.melodySongId && (
+                    <div className="melody-upload-actions">
+                      <button className="ghost-button" onClick={() => melodyFileInputRef.current?.click()} type="button">
+                        <MusicNote size={16} />
+                        העלאת מנגינה
+                      </button>
+                      <button
+                        className={isRecordingMelody ? "ghost-button melody-recording" : "ghost-button"}
+                        onClick={isRecordingMelody ? stopRecordingMelody : startRecordingMelody}
+                        type="button"
+                      >
+                        <Mic size={16} />
+                        {isRecordingMelody ? `עצירת הקלטה (${recordingSeconds}s)` : "הקלטת מנגינה"}
+                      </button>
+                      <input
+                        accept="audio/*"
+                        hidden
+                        onChange={handleMelodyFileChange}
+                        ref={melodyFileInputRef}
+                        type="file"
+                      />
+                    </div>
+                  )}
+
+                  {melodyUploadStatus === "uploading" && (
+                    <p className="lyrics-draft-preview-status">
+                      <Loader size={15} /> מעלים את המנגינה...
+                    </p>
+                  )}
+
+                  {melodyError && <p className="status-message error">{melodyError}</p>}
+
+                  {order.melodySongId && melodyUploadStatus === "ready" && (
+                    <div className="melody-preview-card">
+                      <p className="melody-ready-label">המנגינה שלכם מוכנה ✨</p>
+                      {melodyPreviewUrl && <audio controls src={melodyPreviewUrl} />}
+                      <div className="melody-preview-actions">
+                        <button className="ghost-button" onClick={removeMelody} type="button">
+                          <Refresh size={15} />
+                          הסרה והחלפה
+                        </button>
+                      </div>
+                      <label className="consent-row">
+                        <input
+                          checked={order.melodyRightsConfirmed}
+                          onChange={(event) => setField("melodyRightsConfirmed", event.target.checked)}
+                          type="checkbox"
+                        />
+                        <span>אני מאשר/ת שההקלטה היא שלי או שיש לי הרשאה להשתמש בה.</span>
+                      </label>
+                    </div>
+                  )}
+                </div>
+              )}
 
               <button
                 aria-expanded={advancedOpen}

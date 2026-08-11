@@ -1877,6 +1877,48 @@ h3 {
   margin-top: 0;
 }
 
+.melody-field {
+  gap: 10px;
+}
+
+.melody-upload-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 4px;
+}
+
+.melody-recording {
+  border-color: var(--bad);
+  background: var(--bad-soft);
+  color: var(--bad);
+}
+
+.melody-preview-card {
+  display: grid;
+  gap: 12px;
+  margin-top: 4px;
+  padding: 18px 20px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-card);
+  background: var(--cream-50);
+}
+
+.melody-ready-label {
+  margin: 0;
+  color: var(--burgundy-800);
+  font-weight: 700;
+}
+
+.melody-preview-card audio {
+  width: 100%;
+}
+
+.melody-preview-actions {
+  display: flex;
+  gap: 10px;
+}
+
 .confirm-actions {
   display: flex;
   flex-wrap: wrap;

@@ -1,9 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getUserFromRequest } from "@/lib/auth-user";
 import { isAdminUser } from "@/lib/is-admin";
+import { elevenLabsProvider } from "@/lib/music-providers/elevenlabs-provider";
 import { EXTRA_VERSION_CREDITS, MAX_VERSION_SECONDS } from "@/lib/pricing-catalog";
 import { createServerClient } from "@/lib/supabase-server";
-import { createSongVersion, MusicProviderError, uploadSongAudio } from "@/lib/song-generation";
+import { AudioReference, ConditionStrength, MusicProviderError, uploadSongAudio } from "@/lib/song-generation";
 
 const VERSION_LABELS = ["א", "ב", "ג", "ד", "ה", "ו", "ז", "ח"];
 
@@ -27,7 +28,7 @@ export async function POST(request: NextRequest, ctx: RouteContext<"/api/orders/
   const { data: order } = await supabase
     .from("orders")
     .select(
-      "id, user_id, song_type, recipient, occasion, style, mood, vocalist, language_register, lyric_structure, pronunciation, story, must_include, avoid, song_length_seconds, recipient_gender, custom_lyrics",
+      "id, user_id, song_type, recipient, occasion, style, mood, vocalist, language_register, lyric_structure, pronunciation, story, must_include, avoid, song_length_seconds, recipient_gender, custom_lyrics, inspiration, music_mode, melody_song_id, melody_condition_strength",
     )
     .eq("id", orderId)
     .maybeSingle();
@@ -81,10 +82,15 @@ export async function POST(request: NextRequest, ctx: RouteContext<"/api/orders/
     avoid: order.avoid,
     recipientGender,
     customLyrics: order.custom_lyrics || "",
+    inspiration: order.inspiration || "",
+    audioReference:
+      order.music_mode === "melody" && order.melody_song_id
+        ? ({ songId: order.melody_song_id, conditionStrength: (order.melody_condition_strength || "high") as ConditionStrength } satisfies AudioReference)
+        : undefined,
   };
 
   try {
-    const version = await createSongVersion(orderContent, order.song_length_seconds ?? MAX_VERSION_SECONDS, label);
+    const version = await elevenLabsProvider.generateSong(orderContent, order.song_length_seconds ?? MAX_VERSION_SECONDS, label);
     const audioPath =
       version.audioDataUrl && version.audioContentType
         ? await uploadSongAudio(supabase, user.id, orderId, label, version.audioDataUrl, version.audioContentType)

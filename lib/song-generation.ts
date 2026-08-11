@@ -4,6 +4,19 @@
 // place so none of those routes duplicate the style/mood/vocalist
 // direction maps or the provider call itself.
 
+// ElevenLabs Music v2's documented range for how strictly a generation
+// must follow an audio reference (see composition_plan.chunks[].
+// condition_strength in the /v1/music/compose request).
+export type ConditionStrength = "low" | "medium" | "high" | "xhigh";
+
+// A previously-uploaded reference track (see uploadAudioReference()) to
+// steer a generation's sound/production/tempo — not a copy or replay of
+// that audio; ElevenLabs explicitly generates a new composition.
+export type AudioReference = {
+  songId: string;
+  conditionStrength: ConditionStrength;
+};
+
 export type OrderContent = {
   songType?: string;
   recipient?: string;
@@ -21,6 +34,13 @@ export type OrderContent = {
   // Customer-supplied finished lyrics, used verbatim instead of writing
   // lyrics from `story` — see getHebrewLyrics().
   customLyrics?: string;
+  // Free-text artist/song/style the customer likes — folded into
+  // positive_styles in createSongVersion() as a style direction, never
+  // used to reproduce a specific existing melody.
+  inspiration?: string;
+  // Customer-uploaded melody/hum/demo reference — see
+  // uploadAudioReference() and createSongVersion().
+  audioReference?: AudioReference;
 };
 
 export type GeneratedVersion = {
@@ -674,7 +694,7 @@ function cleanApiKey(value: string | undefined) {
   return withoutWrappingQuotes.replace(/[^\x20-\x7e]/g, "");
 }
 
-function elevenLabsApiKey() {
+export function elevenLabsApiKey() {
   return cleanApiKey(
     process.env.ELEVENLABS_API_KEY ||
       process.env.ELEVEN_API_KEY ||
@@ -766,6 +786,57 @@ function safeFileName(value: string) {
   );
 }
 
+// ElevenLabs only guarantees results for references up to ~30s (see
+// /v1/music/upload docs) — the composition_plan's conditioning_ref
+// range is capped to match regardless of how long the uploaded file is.
+const AUDIO_REFERENCE_RANGE_MS = 30000;
+
+export class AudioReferenceUploadError extends Error {
+  constructor(
+    public providerStatus: number,
+    public providerMessage: string,
+  ) {
+    super("ElevenLabs music reference upload failed");
+  }
+}
+
+// Uploads a customer's melody/hum/demo recording to ElevenLabs
+// (POST /v1/music/upload) and returns the song_id used later as a
+// conditioning_ref in createSongVersion(). This never touches Supabase
+// storage — the raw audio only passes through this server process on
+// its way to ElevenLabs, which is the only place it's actually stored
+// (see supabase-migration-12-melody-reference.sql for why).
+export async function uploadAudioReference(fileBytes: Buffer, contentType: string, fileName: string): Promise<{ songId: string }> {
+  const apiKey = elevenLabsApiKey();
+
+  if (!apiKey) {
+    throw new AudioReferenceUploadError(500, "missing_elevenlabs_api_key");
+  }
+
+  const formData = new FormData();
+  formData.append("file", new Blob([new Uint8Array(fileBytes)], { type: contentType }), fileName);
+
+  const providerResponse = await fetch("https://api.elevenlabs.io/v1/music/upload", {
+    method: "POST",
+    headers: { "xi-api-key": apiKey },
+    body: formData,
+  });
+
+  if (!providerResponse.ok) {
+    const providerError = await providerResponse.text();
+
+    throw new AudioReferenceUploadError(providerResponse.status, providerError.slice(0, 500));
+  }
+
+  const data = (await providerResponse.json()) as { song_id?: string };
+
+  if (!data.song_id) {
+    throw new AudioReferenceUploadError(502, "missing_song_id_in_response");
+  }
+
+  return { songId: data.song_id };
+}
+
 export async function createSongVersion(order: OrderContent, songSeconds: number, versionLabel: string): Promise<GeneratedVersion> {
   const apiKey = elevenLabsApiKey();
   const outputFormat = process.env.ELEVENLABS_OUTPUT_FORMAT || "mp3_44100_128";
@@ -784,6 +855,15 @@ export async function createSongVersion(order: OrderContent, songSeconds: number
     "short singable Hebrew lines",
     songSeconds <= 20 ? "compact 20 second song with immediate vocals" : "full arrangement with intro, verse, chorus and outro",
   ];
+  const inspiration = text(order.inspiration);
+
+  if (inspiration) {
+    // General style/mood direction only — never a request to reproduce a
+    // specific existing recording; "imitating a known artist" stays in
+    // negativeStyles below regardless of this.
+    positiveStyles.push(`general musical feel inspired by ${inspiration}, as an original composition`);
+  }
+
   const negativeStyles = [
     "gibberish Hebrew",
     "transliterated Hebrew",
@@ -812,6 +892,21 @@ export async function createSongVersion(order: OrderContent, songSeconds: number
   // blocks or breaks song generation.
   const vocalizedLyrics = await addNiqqud(lyrics, order.recipientGender === "female");
 
+  // "יש לי מנגינה" — steers the generation's sound/production/tempo toward
+  // the customer's uploaded reference (see uploadAudioReference()). Applied
+  // to the one chunk from the start so it influences the whole composition,
+  // not just a section. ElevenLabs treats this as inspiration, not replay —
+  // it explicitly does not copy/remix the reference audio into the output.
+  const conditioningRef = order.audioReference
+    ? {
+        conditioning_ref: {
+          song_id: order.audioReference.songId,
+          range: { start_ms: 0, end_ms: AUDIO_REFERENCE_RANGE_MS },
+        },
+        condition_strength: order.audioReference.conditionStrength,
+      }
+    : {};
+
   const providerResponse = await fetch(apiUrl, {
     method: "POST",
     headers: {
@@ -827,6 +922,7 @@ export async function createSongVersion(order: OrderContent, songSeconds: number
             positive_styles: positiveStyles,
             negative_styles: negativeStyles,
             context_adherence: "high",
+            ...conditioningRef,
           },
         ],
       },
