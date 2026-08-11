@@ -394,7 +394,7 @@ export default function Home() {
 
   const startNewOrder = useCallback(() => {
     setOrder(initialOrder);
-    setStep(0);
+    setStep(1);
     setStatus("idle");
     setOrderError(null);
     setResult(null);
@@ -561,7 +561,11 @@ export default function Home() {
 
     setOrder(initialOrder);
     setOrderMode("demo");
-    setStep(0);
+    setStep(1);
+    // The free demo is meant to be an instant taste — skip the decision
+    // gate too rather than asking a demo customer to make choices that
+    // barely matter for a 20-second, no-reference-audio sample.
+    setDecisionMade(true);
     setStatus("idle");
     setOrderError(null);
     setResult(null);
@@ -1053,11 +1057,7 @@ export default function Home() {
                 className="primary-button"
                 onClick={() => {
                   setDecisionMade(true);
-                  // Customers who already have their own lyrics don't need
-                  // the "type of song" screen (it only mattered for how
-                  // Shirli would write lyrics from scratch) — skip straight
-                  // to the lyrics/melody step.
-                  setStep(order.lyricsMode === "custom" ? 1 : 0);
+                  setStep(1);
                 }}
                 type="button"
               >
@@ -1068,19 +1068,11 @@ export default function Home() {
           ) : (
             <>
           <div className="steps" aria-label="התקדמות ביצירת השיר">
-            {(order.lyricsMode === "custom"
-              ? [
-                  { index: 1, label: "המילים" },
-                  { index: 2, label: "אימות" },
-                  { index: 3, label: "סיכום" },
-                ]
-              : [
-                  { index: 0, label: "סוג שיר" },
-                  { index: 1, label: "הסיפור" },
-                  { index: 2, label: "אימות" },
-                  { index: 3, label: "סיכום" },
-                ]
-            ).map(({ index, label }, position, all) => (
+            {[
+              { index: 1, label: order.lyricsMode === "custom" ? "המילים" : "הסיפור" },
+              { index: 2, label: "אימות" },
+              { index: 3, label: "סיכום" },
+            ].map(({ index, label }, position, all) => (
               <Fragment key={label}>
                 <button
                   className={step === index ? "active" : step > index ? "done" : ""}
@@ -1099,38 +1091,42 @@ export default function Home() {
             <p className="status-message error form-level-error">{orderError}</p>
           )}
 
-          {step === 0 && (
-            <div className="form-panel">
+          {step === 1 && (
+            <div className="form-panel story-panel">
               <div className="panel-heading">
                 <span className="panel-icon">
-                  <MusicNote size={18} />
+                  <Edit size={18} />
                 </span>
                 <div>
-                  <h3>איזה רגע הופכים לשיר?</h3>
-                  <p>בחרו את הסוג שהכי מתאים לרגע שלכם.</p>
+                  <h3>למי מכינים את השיר?</h3>
+                  <p>כמה פרטים קטנים, והמערכת כבר תהפוך אותם לשיר.</p>
                 </div>
               </div>
-              <div className="type-grid">
-                {songTypes.map((type) => (
-                  <label className={order.songType === type.id ? "type-card selected" : "type-card"} key={type.id}>
-                    <input
-                      checked={order.songType === type.id}
-                      name="songType"
-                      onChange={() => setField("songType", type.id)}
-                      type="radio"
-                    />
-                    {order.songType === type.id && (
-                      <span className="type-card-check">
-                        <CheckSmall size={13} />
+
+              <div className="chip-field">
+                <span className="story-field-label">איזה רגע הופכים לשיר?</span>
+                <div className="type-grid type-grid--compact">
+                  {songTypes.map((type) => (
+                    <label className={order.songType === type.id ? "type-card selected" : "type-card"} key={type.id}>
+                      <input
+                        checked={order.songType === type.id}
+                        name="songType"
+                        onChange={() => setField("songType", type.id)}
+                        type="radio"
+                      />
+                      {order.songType === type.id && (
+                        <span className="type-card-check">
+                          <CheckSmall size={13} />
+                        </span>
+                      )}
+                      <span className="type-card-icon">
+                        <type.icon size={22} />
                       </span>
-                    )}
-                    <span className="type-card-icon">
-                      <type.icon size={22} />
-                    </span>
-                    <strong>{type.label}</strong>
-                    <span>{type.description}</span>
-                  </label>
-                ))}
+                      <strong>{type.label}</strong>
+                      <span>{type.description}</span>
+                    </label>
+                  ))}
+                </div>
               </div>
 
               {orderMode === "full" && (
@@ -1161,25 +1157,6 @@ export default function Home() {
                   יוצרים דמו חינם של 20 שניות — בלי תשלום ובלי התחייבות.
                 </p>
               )}
-
-              <button className="primary-button" type="button" onClick={() => setStep(1)}>
-                ממשיכים לסיפור
-                <ArrowLeft size={18} />
-              </button>
-            </div>
-          )}
-
-          {step === 1 && (
-            <div className="form-panel story-panel">
-              <div className="panel-heading">
-                <span className="panel-icon">
-                  <Edit size={18} />
-                </span>
-                <div>
-                  <h3>למי מכינים את השיר?</h3>
-                  <p>כמה פרטים קטנים, והמערכת כבר תהפוך אותם לשיר.</p>
-                </div>
-              </div>
 
               <label className="story-field">
                 <span className="story-field-label">למי מכינים את השיר?</span>
@@ -1409,11 +1386,7 @@ export default function Home() {
               )}
 
               <div className="form-footer">
-                <button
-                  className="ghost-button"
-                  onClick={() => (order.lyricsMode === "custom" ? setDecisionMade(false) : setStep(0))}
-                  type="button"
-                >
+                <button className="ghost-button" onClick={() => setDecisionMade(false)} type="button">
                   חזרה
                 </button>
                 <button className="primary-button" type="button" onClick={() => setStep(2)}>
