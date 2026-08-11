@@ -1888,6 +1888,31 @@ h3 {
   margin-top: 4px;
 }
 
+.decision-panel {
+  gap: 26px;
+}
+
+.decision-question {
+  display: grid;
+  gap: 12px;
+}
+
+.decision-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.decision-grid .type-card {
+  min-height: 130px;
+}
+
+@media (max-width: 640px) {
+  .decision-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
 .melody-recording {
   border-color: var(--bad);
   background: var(--bad-soft);

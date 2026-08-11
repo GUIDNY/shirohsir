@@ -337,6 +337,12 @@ function formatReset(value: string | null | undefined) {
 export default function Home() {
   const account = useAccount();
   const [step, setStep] = useState(0);
+  // Gates the whole order-tool behind the two upfront decisions ("מה לגבי
+  // המילים?" / "מה לגבי המנגינה?") — order.lyricsMode/musicMode already
+  // drive every downstream question, this just makes the choice the
+  // very first thing a customer sees instead of a toggle buried in step 1.
+  const [decisionMade, setDecisionMade] = useState(false);
+  const [showInspirationField, setShowInspirationField] = useState(false);
   const [order, setOrder] = useState<OrderPayload>(initialOrder);
   const [status, setStatus] = useState<OrderStatus>("idle");
   const [orderError, setOrderError] = useState<string | null>(null);
@@ -395,6 +401,8 @@ export default function Home() {
     setOrderMode("full");
     setAdvancedOpen(false);
     setIdempotencyKey(crypto.randomUUID());
+    setDecisionMade(false);
+    setShowInspirationField(false);
     clearMelody();
   }, [clearMelody]);
 
@@ -945,8 +953,111 @@ export default function Home() {
         </div>
 
         <form className="order-tool" onSubmit={submitOrder}>
+          {!decisionMade ? (
+            <div className="form-panel decision-panel">
+              <div className="panel-heading">
+                <span className="panel-icon">
+                  <Edit size={18} />
+                </span>
+                <div>
+                  <h3>בואו נתחיל</h3>
+                  <p>שתי שאלות קצרות, ונבנה בדיוק את התהליך שמתאים לכם.</p>
+                </div>
+              </div>
+
+              <div className="decision-question">
+                <span className="story-field-label">מה לגבי המילים?</span>
+                <div className="decision-grid">
+                  <label className={order.lyricsMode === "custom" ? "type-card selected" : "type-card"}>
+                    <input
+                      checked={order.lyricsMode === "custom"}
+                      name="lyricsDecision"
+                      onChange={() => setField("lyricsMode", "custom")}
+                      type="radio"
+                    />
+                    {order.lyricsMode === "custom" && (
+                      <span className="type-card-check">
+                        <CheckSmall size={13} />
+                      </span>
+                    )}
+                    <span className="type-card-icon">
+                      <Edit size={22} />
+                    </span>
+                    <strong>יש לי מילים</strong>
+                    <span>כבר כתבתי את המילים לשיר</span>
+                  </label>
+                  <label className={order.lyricsMode === "auto" ? "type-card selected" : "type-card"}>
+                    <input
+                      checked={order.lyricsMode === "auto"}
+                      name="lyricsDecision"
+                      onChange={() => setField("lyricsMode", "auto")}
+                      type="radio"
+                    />
+                    {order.lyricsMode === "auto" && (
+                      <span className="type-card-check">
+                        <CheckSmall size={13} />
+                      </span>
+                    )}
+                    <span className="type-card-icon">
+                      <Lyrics size={22} />
+                    </span>
+                    <strong>אני רוצה שהמערכת תכתוב לי</strong>
+                    <span>אני אספר על השיר ואנחנו נכתוב את המילים</span>
+                  </label>
+                </div>
+              </div>
+
+              <div className="decision-question">
+                <span className="story-field-label">מה לגבי המנגינה?</span>
+                <div className="decision-grid">
+                  <label className={order.musicMode === "reference" ? "type-card selected" : "type-card"}>
+                    <input
+                      checked={order.musicMode === "reference"}
+                      name="musicDecision"
+                      onChange={() => setField("musicMode", "reference")}
+                      type="radio"
+                    />
+                    {order.musicMode === "reference" && (
+                      <span className="type-card-check">
+                        <CheckSmall size={13} />
+                      </span>
+                    )}
+                    <span className="type-card-icon">
+                      <Mic size={22} />
+                    </span>
+                    <strong>יש לי הקלטה להשראה</strong>
+                    <span>אקליט, אזמזם, אשיר או אעלה קובץ</span>
+                  </label>
+                  <label className={order.musicMode !== "reference" ? "type-card selected" : "type-card"}>
+                    <input
+                      checked={order.musicMode !== "reference"}
+                      name="musicDecision"
+                      onChange={() => setField("musicMode", "auto")}
+                      type="radio"
+                    />
+                    {order.musicMode !== "reference" && (
+                      <span className="type-card-check">
+                        <CheckSmall size={13} />
+                      </span>
+                    )}
+                    <span className="type-card-icon">
+                      <MusicNote size={22} />
+                    </span>
+                    <strong>אני רוצה שהמערכת תיצור לי</strong>
+                    <span>המערכת תיצור לחן והפקה לשיר</span>
+                  </label>
+                </div>
+              </div>
+
+              <button className="primary-button" onClick={() => setDecisionMade(true)} type="button">
+                בואו נתחיל
+                <ArrowLeft size={18} />
+              </button>
+            </div>
+          ) : (
+            <>
           <div className="steps" aria-label="התקדמות ביצירת השיר">
-            {["סוג שיר", "הסיפור", "אימות", "סיכום"].map((label, index, all) => (
+            {["סוג שיר", order.lyricsMode === "custom" ? "המילים" : "הסיפור", "אימות", "סיכום"].map((label, index, all) => (
               <Fragment key={label}>
                 <button
                   className={step === index ? "active" : step > index ? "done" : ""}
@@ -1102,26 +1213,6 @@ export default function Home() {
                 )}
               </div>
 
-              <div className="chip-field">
-                <span className="story-field-label">איך רוצים לכתוב את מילות השיר?</span>
-                <div className="occasion-chips">
-                  <button
-                    className={order.lyricsMode === "auto" ? "occasion-chip selected" : "occasion-chip"}
-                    onClick={() => setField("lyricsMode", "auto")}
-                    type="button"
-                  >
-                    נכתוב לכם מהסיפור
-                  </button>
-                  <button
-                    className={order.lyricsMode === "custom" ? "occasion-chip selected" : "occasion-chip"}
-                    onClick={() => setField("lyricsMode", "custom")}
-                    type="button"
-                  >
-                    יש לנו מילים מוכנות
-                  </button>
-                </div>
-              </div>
-
               {order.lyricsMode === "auto" ? (
                 <>
                   <label className="story-field story-field--main">
@@ -1182,43 +1273,28 @@ export default function Home() {
                 </div>
               </div>
 
-              <div className="chip-field">
-                <span className="story-field-label">איך רוצים לגשת למוזיקה של השיר?</span>
-                <div className="occasion-chips">
+              {order.musicMode !== "reference" && (
+                <div className="story-field">
                   <button
-                    className={order.musicMode === "auto" ? "occasion-chip selected" : "occasion-chip"}
-                    onClick={() => setField("musicMode", "auto")}
+                    aria-expanded={showInspirationField}
+                    className="advanced-options-toggle"
+                    onClick={() => setShowInspirationField((value) => !value)}
                     type="button"
                   >
-                    תפתיעו אותי
+                    יש זמר או שיר שאתם אוהבים? <span className="story-field-optional">אופציונלי</span>
+                    <ChevronDown className={showInspirationField ? "advanced-options-chevron open" : "advanced-options-chevron"} size={14} />
                   </button>
-                  <button
-                    className={order.musicMode === "inspiration" ? "occasion-chip selected" : "occasion-chip"}
-                    onClick={() => setField("musicMode", "inspiration")}
-                    type="button"
-                  >
-                    יש לי השראה
-                  </button>
-                  <button
-                    className={order.musicMode === "reference" ? "occasion-chip selected" : "occasion-chip"}
-                    onClick={() => setField("musicMode", "reference")}
-                    type="button"
-                  >
-                    יש לי הקלטה להשראה
-                  </button>
+                  {showInspirationField && (
+                    <div className="advanced-options-panel">
+                      <input
+                        onChange={(event) => setField("inspiration", event.target.value)}
+                        placeholder="לדוגמה: עומר אדם, אושר כהן, פופ ישראלי..."
+                        value={order.inspiration}
+                      />
+                      <span className="story-field-hint">נשתמש בזה כהשראה כללית לסגנון — לא כשכפול של שיר קיים.</span>
+                    </div>
+                  )}
                 </div>
-              </div>
-
-              {order.musicMode === "inspiration" && (
-                <label className="story-field">
-                  <span className="story-field-label">יש זמר או שיר שאתם אוהבים?</span>
-                  <input
-                    onChange={(event) => setField("inspiration", event.target.value)}
-                    placeholder="לדוגמה: עומר אדם, אושר כהן, פופ ישראלי..."
-                    value={order.inspiration}
-                  />
-                  <span className="story-field-hint">נשתמש בזה כהשראה כללית לסגנון — לא כשכפול של שיר קיים.</span>
-                </label>
               )}
 
               {order.musicMode === "reference" && (
@@ -1565,6 +1641,8 @@ export default function Home() {
                 </div>
               )}
             </div>
+          )}
+            </>
           )}
         </form>
 
