@@ -1,7 +1,9 @@
 import type { Metadata } from "next";
 import { Heebo, Montserrat } from "next/font/google";
 import { singleSongPlan } from "@/lib/pricing-catalog";
-import { SITE_URL } from "@/lib/site-config";
+import { BING_SITE_VERIFICATION, GOOGLE_SITE_VERIFICATION, SITE_NAME, SITE_URL } from "@/lib/site-config";
+import { siteJsonLd } from "@/lib/structured-data";
+import { JsonLd } from "./JsonLd";
 import "./globals.css";
 
 const heebo = Heebo({
@@ -29,17 +31,28 @@ export const metadata: Metadata = {
   metadataBase: new URL(SITE_URL),
   title: siteTitle,
   description: siteDescription,
+  applicationName: SITE_NAME,
   icons: {
     icon: "/favicon.png",
     shortcut: "/favicon.png",
   },
+  // The homepage's own canonical + hreflang (app/page.tsx is a client
+  // component, so its metadata lives here). Every other indexable page
+  // must set its own `alternates` — that replaces this whole object —
+  // or it would inherit the "/" canonical and these hreflang links.
   alternates: {
     canonical: "/",
+    languages: {
+      he: "/",
+      en: "/en",
+      "x-default": "/",
+    },
   },
   openGraph: {
     title: siteTitle,
     description: siteDescription,
     url: "/",
+    siteName: SITE_NAME,
     locale: "he_IL",
     type: "website",
     images: [
@@ -57,6 +70,12 @@ export const metadata: Metadata = {
     description: siteDescription,
     images: ["/og.png"],
   },
+  // Search-console ownership tags — each renders only once its token in
+  // lib/site-config.ts is filled in.
+  verification: {
+    google: GOOGLE_SITE_VERIFICATION || undefined,
+    other: BING_SITE_VERIFICATION ? { "msvalidate.01": BING_SITE_VERIFICATION } : undefined,
+  },
 };
 
 export default function RootLayout({
@@ -66,7 +85,10 @@ export default function RootLayout({
 }>) {
   return (
     <html dir="rtl" lang="he">
-      <body className={`${heebo.variable} ${montserrat.variable} antialiased`}>{children}</body>
+      <body className={`${heebo.variable} ${montserrat.variable} antialiased`}>
+        {children}
+        <JsonLd data={siteJsonLd} />
+      </body>
     </html>
   );
 }

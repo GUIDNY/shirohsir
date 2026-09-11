@@ -6,6 +6,7 @@ import { SiteFooter } from "./SiteFooter";
 // header (no account state needed — these are pure reading pages), the
 // Hebrew content, then the full English translation on the same URL
 // (rather than behind a language toggle a reviewer might not find).
+// Also used by the Hebrew-only /faq, which simply omits the English part.
 export function LegalPageShell({
   titleHe,
   titleEn,
@@ -13,9 +14,9 @@ export function LegalPageShell({
   englishChildren,
 }: {
   titleHe: string;
-  titleEn: string;
+  titleEn?: string;
   children: ReactNode;
-  englishChildren: ReactNode;
+  englishChildren?: ReactNode;
 }) {
   return (
     <main className="legal-page" dir="rtl">
@@ -35,14 +36,18 @@ export function LegalPageShell({
         {children}
       </article>
 
-      <div className="legal-divider">
-        <span>English Version</span>
-      </div>
+      {englishChildren && (
+        <>
+          <div className="legal-divider">
+            <span>English Version</span>
+          </div>
 
-      <article className="legal-content legal-content--en" dir="ltr" id="english-version" lang="en">
-        <h1>{titleEn}</h1>
-        {englishChildren}
-      </article>
+          <article className="legal-content legal-content--en" dir="ltr" id="english-version" lang="en">
+            <h1>{titleEn}</h1>
+            {englishChildren}
+          </article>
+        </>
+      )}
 
       <SiteFooter />
     </main>

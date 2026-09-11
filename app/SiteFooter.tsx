@@ -17,6 +17,7 @@ export function SiteFooter() {
         </div>
 
         <nav className="site-footer-links" aria-label="קישורים משפטיים">
+          <Link href="/faq">שאלות נפוצות</Link>
           <Link href="/terms">תנאי שימוש</Link>
           <Link href="/privacy">מדיניות פרטיות</Link>
           <Link href="/refund-policy">מדיניות החזרים</Link>

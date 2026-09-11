@@ -24,6 +24,7 @@ import {
   Storefront,
 } from "./icons";
 import { BillingModal } from "./BillingModal";
+import { JsonLd } from "./JsonLd";
 import { promptSignIn } from "./promptSignIn";
 import { SiteFooter } from "./SiteFooter";
 import { SiteHeader } from "./SiteHeader";
@@ -34,6 +35,7 @@ import {
   singleSongPlan,
   SONG_LENGTH_OPTIONS,
 } from "@/lib/pricing-catalog";
+import { homeServiceJsonLd } from "@/lib/structured-data";
 import { useAccount } from "./useAccount";
 
 type SongType = "gift" | "business" | "graduation";
@@ -1858,6 +1860,8 @@ export default function Home() {
           })}
         </div>
       </section>
+
+      <JsonLd data={homeServiceJsonLd} />
 
       <SiteFooter />
 

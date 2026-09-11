@@ -10,13 +10,21 @@ const description =
 export const metadata: Metadata = {
   title,
   description,
+  // The English counterpart of the Hebrew homepage — hreflang mirrors the
+  // homepage's (app/layout.tsx).
   alternates: {
     canonical: "/en",
+    languages: {
+      he: "/",
+      en: "/en",
+      "x-default": "/",
+    },
   },
   openGraph: {
     title,
     description,
     url: "/en",
+    locale: "en_US",
     images: ["/og.png"],
   },
 };

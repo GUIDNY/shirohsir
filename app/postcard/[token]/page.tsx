@@ -34,6 +34,10 @@ async function getPostcard(token: string) {
   return { ...order, audioSignedUrl: signed?.signedUrl ?? null };
 }
 
+// Postcards are private share links — never indexed or followed by
+// search engines (robots.txt also disallows /postcard/).
+const noIndex: Metadata["robots"] = { index: false, follow: false };
+
 export async function generateMetadata({
   params,
 }: {
@@ -43,7 +47,7 @@ export async function generateMetadata({
   const postcard = await getPostcard(token);
 
   if (!postcard) {
-    return { title: "גלויה לא נמצאה" };
+    return { title: "גלויה לא נמצאה", robots: noIndex };
   }
 
   const title = `שיר בשביל ${postcard.recipient} | Shirli`;
@@ -53,6 +57,7 @@ export async function generateMetadata({
   return {
     title,
     description,
+    robots: noIndex,
     alternates: {
       canonical: url,
     },
