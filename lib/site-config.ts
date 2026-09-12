@@ -23,9 +23,7 @@ export const SITE_NAME_HE = "שירלי";
 // them, so a placeholder can never reach the page.
 export const SOCIAL_PROFILES = {
   instagram: "https://www.instagram.com/myshirli.official/",
-  // Numeric profile URL — stable and already live. Swap to
-  // https://www.facebook.com/myshirli once that username is claimed.
-  facebook: "https://www.facebook.com/profile.php?id=61594196104181",
+  facebook: "https://www.facebook.com/myshirli",
 };
 
 export const SOCIAL_PROFILE_URLS = Object.values(SOCIAL_PROFILES).filter(
