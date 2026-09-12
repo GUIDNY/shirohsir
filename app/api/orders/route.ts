@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto";
 import { NextRequest, NextResponse } from "next/server";
 import { getUserFromRequest } from "@/lib/auth-user";
 import { isAdminUser } from "@/lib/is-admin";
+import { sendOrderReadyEmail } from "@/lib/email";
 import { elevenLabsProvider } from "@/lib/music-providers/elevenlabs-provider";
 import { CREDITS_PER_SONG, FREE_DEMO, MAX_VERSION_SECONDS, SONG_LENGTH_OPTIONS } from "@/lib/pricing-catalog";
 import { createServerClient } from "@/lib/supabase-server";
@@ -299,6 +300,16 @@ export async function POST(request: NextRequest) {
     if (versionsError) {
       console.error("Failed to persist song versions:", versionsError.message);
     }
+
+    // Best-effort — the customer already has the songs in this response
+    // regardless of whether the email sends, so a failure here never
+    // affects the order itself.
+    await sendOrderReadyEmail({
+      to: text(enrichedOrder.email),
+      customerName: text(enrichedOrder.customerName),
+      recipient: text(enrichedOrder.recipient),
+      occasion: text(enrichedOrder.occasion),
+    }).catch(() => {});
 
     return NextResponse.json({
       orderId,
