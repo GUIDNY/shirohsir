@@ -16,25 +16,28 @@
 export const LEMONSQUEEZY_STORE_URL = "https://myshirli.lemonsqueezy.com";
 
 // variant_id -> our plan id (see lib/pricing-catalog.ts findPricingPlan).
-// Used by the webhook handler — confirmed correct via live testing.
+// Used by the webhook handler — these are the LIVE (non-test_mode) variant
+// ids, confirmed via GET /v1/variants?filter[product_id]=... with the live
+// API key on 2026-09-12, matching the live product prices exactly.
 export const LEMONSQUEEZY_VARIANT_TO_PLAN: Record<string, string> = {
-  "1997405": "single-song",
-  "1997408": "pack-3",
-  "1997410": "pack-5",
-  "1997419": "plan-personal",
-  "1997425": "plan-family",
-  "1997431": "plan-creators",
+  "2119422": "single-song",
+  "2119448": "pack-3",
+  "2119466": "pack-5",
+  "2119476": "plan-personal",
+  "2119509": "plan-family",
+  "2119526": "plan-creators",
 };
 
-// plan id -> real checkout URL, fetched from each product's own
-// buy_now_url via the API (GET /v1/products?filter[store_id]=448289).
+// plan id -> real checkout URL, fetched from each LIVE product's own
+// buy_now_url via the API (GET /v1/products?filter[store_id]=448289) using
+// the live API key.
 const PLAN_TO_CHECKOUT_URL: Record<string, string> = {
-  "single-song": "https://myshirli.lemonsqueezy.com/checkout/buy/cad0d9dc-1ffd-4b8b-b9a5-65155c2694c3",
-  "pack-3": "https://myshirli.lemonsqueezy.com/checkout/buy/21ee6adc-e45b-4e96-bc2f-7acf584b8cd9",
-  "pack-5": "https://myshirli.lemonsqueezy.com/checkout/buy/46f5dd24-fe24-47aa-9b33-733f3590530a",
-  "plan-personal": "https://myshirli.lemonsqueezy.com/checkout/buy/48261a08-d1f8-4f86-92b9-8225b747980b",
-  "plan-family": "https://myshirli.lemonsqueezy.com/checkout/buy/b6f075d1-d3f5-457b-ab7c-6decb139574b",
-  "plan-creators": "https://myshirli.lemonsqueezy.com/checkout/buy/9a11da4f-2309-4400-a743-39af8ee27c17",
+  "single-song": "https://myshirli.lemonsqueezy.com/checkout/buy/45bb91b9-4709-42c3-8376-653ae84382d0",
+  "pack-3": "https://myshirli.lemonsqueezy.com/checkout/buy/e923a771-151f-4d36-9c43-548e7fedaef4",
+  "pack-5": "https://myshirli.lemonsqueezy.com/checkout/buy/38b13600-dfdb-42c6-af6b-508324a24b66",
+  "plan-personal": "https://myshirli.lemonsqueezy.com/checkout/buy/f1e2a476-ce30-47a0-954e-365fde7c5d76",
+  "plan-family": "https://myshirli.lemonsqueezy.com/checkout/buy/0d183d4b-8312-4971-8515-fa7581c67a31",
+  "plan-creators": "https://myshirli.lemonsqueezy.com/checkout/buy/3106fe35-8d95-42fe-8e86-1816913bb2f7",
 };
 
 export function buildCheckoutUrl(planId: string, user: { id: string; email?: string | null }): string | null {
