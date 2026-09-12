@@ -1169,6 +1169,24 @@ export async function createSongVersion(order: OrderContent, songSeconds: number
   };
 }
 
+// Storage object keys need to be ASCII-safe — version labels are the
+// Hebrew letters א-ח (see VERSION_LABELS in extra-version/route.ts),
+// which Supabase Storage's key validation rejects ("Invalid key"),
+// silently losing every order's downloadable audio. Only the STORAGE
+// PATH needs this — the Hebrew letter stays as-is everywhere else
+// (DB column, UI).
+const HEBREW_VERSION_TO_SLUG: Record<string, string> = {
+  א: "a", ב: "b", ג: "c", ד: "d", ה: "e", ו: "f", ז: "g", ח: "h",
+};
+
+function safeVersionSlug(versionLabel: string): string {
+  return (
+    HEBREW_VERSION_TO_SLUG[versionLabel] ||
+    versionLabel.replace(/[^\x20-\x7e]/g, "").trim() ||
+    "v"
+  );
+}
+
 export async function uploadSongAudio(
   supabase: { storage: { from: (bucket: string) => { upload: (path: string, body: Buffer, opts: { contentType: string; upsert: boolean }) => Promise<{ error: { message: string } | null }> } } },
   userId: string,
@@ -1186,7 +1204,7 @@ export async function uploadSongAudio(
 
     const bytes = Buffer.from(base64, "base64");
     const extension = contentType.includes("wav") ? "wav" : "mp3";
-    const path = `${userId}/${orderId}-${versionLabel}-${Date.now()}.${extension}`;
+    const path = `${userId}/${orderId}-${safeVersionSlug(versionLabel)}-${Date.now()}.${extension}`;
 
     const { error } = await supabase.storage.from("songs").upload(path, bytes, {
       contentType,
