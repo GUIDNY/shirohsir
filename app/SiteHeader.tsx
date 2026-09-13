@@ -20,6 +20,7 @@ export function SiteHeader({
   adminSlot,
   navAriaLabel = "ניווט ראשי",
   newSongLabel = "שיר חדש",
+  locale = "he",
 }: {
   account: ReturnType<typeof useAccount>;
   homeHref?: string;
@@ -32,6 +33,7 @@ export function SiteHeader({
   // text/aria-label appearing on that page.
   navAriaLabel?: string;
   newSongLabel?: string;
+  locale?: "he" | "en";
 }) {
   return (
     <nav className="topbar" aria-label={navAriaLabel}>
@@ -57,7 +59,7 @@ export function SiteHeader({
           <Plus size={16} />
           {newSongLabel}
         </button>
-        <AccountPanel account={account} />
+        <AccountPanel account={account} locale={locale} />
       </div>
     </nav>
   );

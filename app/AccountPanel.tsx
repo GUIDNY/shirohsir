@@ -8,7 +8,15 @@ import { MySongsModal } from "./MySongsModal";
 
 type Mode = "signIn" | "signUp";
 
-function ReferralModal({ account, onClose }: { account: ReturnType<typeof useAccount>; onClose: () => void }) {
+function ReferralModal({
+  account,
+  onClose,
+  locale = "he",
+}: {
+  account: ReturnType<typeof useAccount>;
+  onClose: () => void;
+  locale?: "he" | "en";
+}) {
   const { credits, session, refreshCredits } = account;
   const [copied, setCopied] = useState(false);
   const [claiming, setClaiming] = useState(false);
@@ -50,7 +58,9 @@ function ReferralModal({ account, onClose }: { account: ReturnType<typeof useAcc
       });
 
       if (response.ok) {
-        setShareMessage("קיבלת בונוס על השיתוף! היתרה שלך עודכנה.");
+        setShareMessage(
+          locale === "en" ? "You got a sharing bonus! Your balance has been updated." : "קיבלת בונוס על השיתוף! היתרה שלך עודכנה.",
+        );
         void refreshCredits();
       }
     } catch {
@@ -64,28 +74,36 @@ function ReferralModal({ account, onClose }: { account: ReturnType<typeof useAcc
     <div className="billing-overlay" onClick={onClose}>
       <div className="billing-modal referral-modal" onClick={(event) => event.stopPropagation()}>
         <div className="billing-header">
-          <h3>הזמנת חברים</h3>
-          <button aria-label="סגירה" className="billing-close" onClick={onClose} type="button">
+          <h3>{locale === "en" ? "Invite friends" : "הזמנת חברים"}</h3>
+          <button aria-label={locale === "en" ? "Close" : "סגירה"} className="billing-close" onClick={onClose} type="button">
             ✕
           </button>
         </div>
 
-        <p className="billing-demo-note">כל חבר שנרשם עם הקישור שלכם מקבל בונוס הצטרפות — וגם אתם.</p>
+        <p className="billing-demo-note">
+          {locale === "en"
+            ? "Every friend who signs up with your link gets a welcome bonus — and so do you."
+            : "כל חבר שנרשם עם הקישור שלכם מקבל בונוס הצטרפות — וגם אתם."}
+        </p>
 
         <div className="referral-link-row">
           <input dir="ltr" readOnly value={referralLink} />
           <button type="button" onClick={() => void copyLink()}>
-            {copied ? "הועתק!" : "העתקה"}
+            {locale === "en" ? (copied ? "Copied!" : "Copy") : copied ? "הועתק!" : "העתקה"}
           </button>
         </div>
 
         {!credits?.shareBonusClaimed ? (
           <button className="referral-share" disabled={claiming} onClick={() => void shareOnFacebook()} type="button">
             {claiming && <Loader size={14} />}
-            שיתוף בפייסבוק
+            {locale === "en" ? "Share on Facebook" : "שיתוף בפייסבוק"}
           </button>
         ) : (
-          shareMessage === null && <p className="referral-claimed">כבר קיבלתם בונוס על שיתוף</p>
+          shareMessage === null && (
+            <p className="referral-claimed">
+              {locale === "en" ? "You’ve already claimed your sharing bonus" : "כבר קיבלתם בונוס על שיתוף"}
+            </p>
+          )
         )}
         {shareMessage && <p className="referral-claimed">{shareMessage}</p>}
       </div>
@@ -93,7 +111,15 @@ function ReferralModal({ account, onClose }: { account: ReturnType<typeof useAcc
   );
 }
 
-export function AccountPanel({ account }: { account: ReturnType<typeof useAccount> }) {
+export function AccountPanel({
+  account,
+  locale = "he",
+}: {
+  account: ReturnType<typeof useAccount>;
+  // Optional locale override — defaults to Hebrew so every existing caller
+  // (all of them, today) renders byte-identical to before this prop existed.
+  locale?: "he" | "en";
+}) {
   const { session, user, authLoading, authError, credits, signUp, signIn, signOut } = account;
   const [open, setOpen] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
@@ -162,7 +188,7 @@ export function AccountPanel({ account }: { account: ReturnType<typeof useAccoun
   };
 
   if (authLoading) {
-    return <div className="account-pill account-pill-loading">רק רגע...</div>;
+    return <div className="account-pill account-pill-loading">{locale === "en" ? "One moment..." : "רק רגע..."}</div>;
   }
 
   if (session && user) {
@@ -171,14 +197,14 @@ export function AccountPanel({ account }: { account: ReturnType<typeof useAccoun
     return (
       <div className="account-widget">
         {!isAdmin && typeof credits?.balance === "number" && (
-          <span className="header-balance" title="היתרה שלך ליצירת שירים">
-            יתרה: {credits.balance}
+          <span className="header-balance" title={locale === "en" ? "Your balance for creating songs" : "היתרה שלך ליצירת שירים"}>
+            {locale === "en" ? `Balance: ${credits.balance}` : `יתרה: ${credits.balance}`}
           </span>
         )}
 
         <button
           aria-expanded={menuOpen}
-          aria-label="תפריט משתמש"
+          aria-label={locale === "en" ? "User menu" : "תפריט משתמש"}
           className="user-menu-trigger"
           onClick={() => setMenuOpen((v) => !v)}
           type="button"
@@ -192,7 +218,7 @@ export function AccountPanel({ account }: { account: ReturnType<typeof useAccoun
             <div className="user-menu-email" dir="ltr">
               {user.email}
             </div>
-            {isAdmin && <span className="user-menu-admin-tag">מסך ניהול</span>}
+            {isAdmin && <span className="user-menu-admin-tag">{locale === "en" ? "Admin view" : "מסך ניהול"}</span>}
             <button
               type="button"
               onClick={() => {
@@ -200,7 +226,7 @@ export function AccountPanel({ account }: { account: ReturnType<typeof useAccoun
                 setMenuOpen(false);
               }}
             >
-              השירים שלי
+              {locale === "en" ? "My Songs" : "השירים שלי"}
             </button>
             {!isAdmin && (
               <button
@@ -210,7 +236,7 @@ export function AccountPanel({ account }: { account: ReturnType<typeof useAccoun
                   setMenuOpen(false);
                 }}
               >
-                הזמנת חברים
+                {locale === "en" ? "Invite friends" : "הזמנת חברים"}
               </button>
             )}
             {!isAdmin && (
@@ -221,7 +247,7 @@ export function AccountPanel({ account }: { account: ReturnType<typeof useAccoun
                   setMenuOpen(false);
                 }}
               >
-                הקרדיטים שלי
+                {locale === "en" ? "My Credits" : "הקרדיטים שלי"}
               </button>
             )}
             <button
@@ -232,7 +258,7 @@ export function AccountPanel({ account }: { account: ReturnType<typeof useAccoun
                 void signOut();
               }}
             >
-              התנתקות
+              {locale === "en" ? "Sign out" : "התנתקות"}
             </button>
           </div>
         )}
@@ -240,6 +266,7 @@ export function AccountPanel({ account }: { account: ReturnType<typeof useAccoun
         {walletOpen && (
           <CreditWalletModal
             account={account}
+            locale={locale}
             onClose={() => setWalletOpen(false)}
             onBuyCredits={() => {
               setWalletOpen(false);
@@ -251,8 +278,8 @@ export function AccountPanel({ account }: { account: ReturnType<typeof useAccoun
             }}
           />
         )}
-        {songsOpen && <MySongsModal account={account} onClose={() => setSongsOpen(false)} />}
-        {referralOpen && <ReferralModal account={account} onClose={() => setReferralOpen(false)} />}
+        {songsOpen && <MySongsModal account={account} locale={locale} onClose={() => setSongsOpen(false)} />}
+        {referralOpen && <ReferralModal account={account} locale={locale} onClose={() => setReferralOpen(false)} />}
       </div>
     );
   }
@@ -265,7 +292,7 @@ export function AccountPanel({ account }: { account: ReturnType<typeof useAccoun
         type="button"
         onClick={() => setOpen((v) => !v)}
       >
-        התחברות
+        {locale === "en" ? "Sign in" : "התחברות"}
       </button>
 
       {open && (
@@ -279,7 +306,7 @@ export function AccountPanel({ account }: { account: ReturnType<typeof useAccoun
                 setConfirmationSent(false);
               }}
             >
-              התחברות
+              {locale === "en" ? "Sign in" : "התחברות"}
             </button>
             <button
               className={mode === "signUp" ? "active" : ""}
@@ -289,18 +316,20 @@ export function AccountPanel({ account }: { account: ReturnType<typeof useAccoun
                 setConfirmationSent(false);
               }}
             >
-              הרשמה
+              {locale === "en" ? "Sign up" : "הרשמה"}
             </button>
           </div>
 
           {confirmationSent ? (
             <p className="account-confirmation">
-              שלחנו מייל אישור ל־{email}. לוחצים על הקישור שם כדי להפעיל את החשבון.
+              {locale === "en"
+                ? `We sent a confirmation email to ${email}. Click the link there to activate your account.`
+                : `שלחנו מייל אישור ל־${email}. לוחצים על הקישור שם כדי להפעיל את החשבון.`}
             </p>
           ) : (
             <form className="account-form" onSubmit={submit}>
               <label>
-                אימייל
+                {locale === "en" ? "Email" : "אימייל"}
                 <input
                   dir="ltr"
                   required
@@ -311,7 +340,7 @@ export function AccountPanel({ account }: { account: ReturnType<typeof useAccoun
                 />
               </label>
               <label>
-                סיסמה
+                {locale === "en" ? "Password" : "סיסמה"}
                 <input
                   dir="ltr"
                   minLength={6}
@@ -319,7 +348,7 @@ export function AccountPanel({ account }: { account: ReturnType<typeof useAccoun
                   type="password"
                   value={password}
                   onChange={(event) => setPassword(event.target.value)}
-                  placeholder="לפחות 6 תווים"
+                  placeholder={locale === "en" ? "At least 6 characters" : "לפחות 6 תווים"}
                 />
               </label>
 
@@ -327,12 +356,24 @@ export function AccountPanel({ account }: { account: ReturnType<typeof useAccoun
 
               <button className="account-submit" disabled={submitting} type="submit">
                 {submitting && <Loader size={16} />}
-                {mode === "signIn" ? "התחברות" : "יצירת חשבון"}
+                {locale === "en"
+                  ? mode === "signIn"
+                    ? "Sign in"
+                    : "Create account"
+                  : mode === "signIn"
+                    ? "התחברות"
+                    : "יצירת חשבון"}
               </button>
 
               {mode === "signUp" && (
                 <p className="account-hint">
-                  {referralCodeFromUrl ? "הוזמנתם על ידי חבר — תקבלו בונוס הצטרפות!" : "מקבלים יתרה חינם להתחלה."}
+                  {locale === "en"
+                    ? referralCodeFromUrl
+                      ? "You were invited by a friend — you’ll get a welcome bonus!"
+                      : "Get free starting credits."
+                    : referralCodeFromUrl
+                      ? "הוזמנתם על ידי חבר — תקבלו בונוס הצטרפות!"
+                      : "מקבלים יתרה חינם להתחלה."}
                 </p>
               )}
             </form>

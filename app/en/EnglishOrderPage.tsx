@@ -931,6 +931,7 @@ export function EnglishOrderPage() {
         ]}
         navAriaLabel="Main navigation"
         newSongLabel="New Song"
+        locale="en"
         onNewSong={() => {
           startNewOrder();
           goToSection("order");

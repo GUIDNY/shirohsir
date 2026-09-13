@@ -25,26 +25,37 @@ type SongOrder = {
   versions: SongVersionAudio[];
 };
 
-const songTypeLabels: Record<string, string> = {
-  gift: "שיר מתנה",
-  business: "שיר לעסק",
-  graduation: "מסיבת סיום",
+const songTypeLabels: Record<"he" | "en", Record<string, string>> = {
+  he: {
+    gift: "שיר מתנה",
+    business: "שיר לעסק",
+    graduation: "מסיבת סיום",
+  },
+  en: {
+    gift: "Gift song",
+    business: "Business song",
+    graduation: "Graduation party",
+  },
 };
 
-function formatDate(value: string) {
-  return new Intl.DateTimeFormat("he-IL", { day: "2-digit", month: "2-digit", year: "numeric" }).format(
-    new Date(value),
-  );
+function formatDate(value: string, locale: "he" | "en") {
+  return new Intl.DateTimeFormat(locale === "en" ? "en-US" : "he-IL", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+  }).format(new Date(value));
 }
 
 function PostcardControls({
   order,
   accessToken,
   onCreated,
+  locale = "he",
 }: {
   order: SongOrder;
   accessToken: string | undefined;
   onCreated: (shareToken: string, photoUrl: string) => void;
+  locale?: "he" | "en";
 }) {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [uploading, setUploading] = useState(false);
@@ -88,13 +99,13 @@ function PostcardControls({
       const data = await response.json();
 
       if (!response.ok) {
-        setError(data.error || "שגיאה ביצירת הגלויה");
+        setError(data.error || (locale === "en" ? "Error creating the postcard" : "שגיאה ביצירת הגלויה"));
         return;
       }
 
       onCreated(data.shareToken, data.photoUrl);
     } catch {
-      setError("שגיאה ביצירת הגלויה");
+      setError(locale === "en" ? "Error creating the postcard" : "שגיאה ביצירת הגלויה");
     } finally {
       setUploading(false);
     }
@@ -123,19 +134,19 @@ function PostcardControls({
       {shareLink ? (
         <div className="postcard-controls-link">
           <a href={shareLink} rel="noopener noreferrer" target="_blank">
-            צפייה בגלויה
+            {locale === "en" ? "View postcard" : "צפייה בגלויה"}
           </a>
           <button onClick={() => void copyLink()} type="button">
-            {copied ? "הועתק!" : "העתקת קישור"}
+            {locale === "en" ? (copied ? "Copied!" : "Copy link") : copied ? "הועתק!" : "העתקת קישור"}
           </button>
           <button disabled={uploading} onClick={() => fileInputRef.current?.click()} type="button">
-            {uploading ? <Loader size={14} /> : "החלפת תמונה"}
+            {uploading ? <Loader size={14} /> : locale === "en" ? "Replace photo" : "החלפת תמונה"}
           </button>
         </div>
       ) : (
         <button className="postcard-create-btn" disabled={uploading} onClick={() => fileInputRef.current?.click()} type="button">
           {uploading && <Loader size={14} />}
-          הוספת תמונה ושיתוף כגלויה
+          {locale === "en" ? "Add a photo & share as a postcard" : "הוספת תמונה ושיתוף כגלויה"}
         </button>
       )}
 
@@ -149,11 +160,13 @@ function ExtraVersionButton({
   accessToken,
   onCreated,
   refreshCredits,
+  locale = "he",
 }: {
   order: SongOrder;
   accessToken: string | undefined;
   onCreated: (label: string) => void;
   refreshCredits: () => void;
+  locale?: "he" | "en";
 }) {
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -175,14 +188,14 @@ function ExtraVersionButton({
       const data = await response.json();
 
       if (!response.ok) {
-        setError(data.error || "שגיאה ביצירת הגרסה הנוספת");
+        setError(data.error || (locale === "en" ? "Error creating the extra version" : "שגיאה ביצירת הגרסה הנוספת"));
         return;
       }
 
       onCreated(data.version.label);
       refreshCredits();
     } catch {
-      setError("שגיאה ביצירת הגרסה הנוספת");
+      setError(locale === "en" ? "Error creating the extra version" : "שגיאה ביצירת הגרסה הנוספת");
     } finally {
       setPending(false);
     }
@@ -196,14 +209,26 @@ function ExtraVersionButton({
     <div className="extra-version-row">
       <button className="postcard-create-btn" disabled={pending} onClick={() => void requestExtraVersion()} type="button">
         {pending ? <Loader size={14} /> : <Plus size={14} />}
-        גרסה נוספת ({EXTRA_VERSION_CREDITS} קרדיטים)
+        {locale === "en"
+          ? `Extra version (${EXTRA_VERSION_CREDITS} credits)`
+          : `גרסה נוספת (${EXTRA_VERSION_CREDITS} קרדיטים)`}
       </button>
       {error && <p className="billing-error">{error}</p>}
     </div>
   );
 }
 
-export function MySongsModal({ account, onClose }: { account: ReturnType<typeof useAccount>; onClose: () => void }) {
+export function MySongsModal({
+  account,
+  onClose,
+  locale = "he",
+}: {
+  account: ReturnType<typeof useAccount>;
+  onClose: () => void;
+  // Optional locale override — defaults to Hebrew so every existing caller
+  // (all of them, today) renders byte-identical to before this prop existed.
+  locale?: "he" | "en";
+}) {
   const [orders, setOrders] = useState<SongOrder[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const accessToken = account.session?.access_token;
@@ -222,8 +247,8 @@ export function MySongsModal({ account, onClose }: { account: ReturnType<typeof 
         return response.json();
       })
       .then((data) => setOrders(data.orders))
-      .catch(() => setError("לא הצלחנו לטעון את השירים שלך."));
-  }, [accessToken]);
+      .catch(() => setError(locale === "en" ? "We couldn’t load your songs." : "לא הצלחנו לטעון את השירים שלך."));
+  }, [accessToken, locale]);
 
   useEffect(() => {
     loadOrders();
@@ -241,8 +266,8 @@ export function MySongsModal({ account, onClose }: { account: ReturnType<typeof 
     <div className="billing-overlay" onClick={onClose}>
       <div className="billing-modal songs-modal" onClick={(event) => event.stopPropagation()}>
         <div className="billing-header">
-          <h3>השירים שלי</h3>
-          <button aria-label="סגירה" className="billing-close" onClick={onClose} type="button">
+          <h3>{locale === "en" ? "My Songs" : "השירים שלי"}</h3>
+          <button aria-label={locale === "en" ? "Close" : "סגירה"} className="billing-close" onClick={onClose} type="button">
             ✕
           </button>
         </div>
@@ -252,11 +277,13 @@ export function MySongsModal({ account, onClose }: { account: ReturnType<typeof 
         {!orders && !error && (
           <div className="songs-loading">
             <Loader size={20} />
-            <span>טוען שירים...</span>
+            <span>{locale === "en" ? "Loading songs..." : "טוען שירים..."}</span>
           </div>
         )}
 
-        {orders && orders.length === 0 && <p className="songs-empty">עדיין לא הזמנת שיר.</p>}
+        {orders && orders.length === 0 && (
+          <p className="songs-empty">{locale === "en" ? "You haven’t ordered a song yet." : "עדיין לא הזמנת שיר."}</p>
+        )}
 
         {orders && orders.length > 0 && (
           <div className="songs-list">
@@ -266,10 +293,10 @@ export function MySongsModal({ account, onClose }: { account: ReturnType<typeof 
                   <div>
                     <strong>{order.recipient}</strong>
                     <span>
-                      {songTypeLabels[order.song_type] || order.song_type} · {order.occasion}
+                      {songTypeLabels[locale][order.song_type] || order.song_type} · {order.occasion}
                     </span>
                   </div>
-                  <span className="song-card-date">{formatDate(order.created_at)}</span>
+                  <span className="song-card-date">{formatDate(order.created_at, locale)}</span>
                 </div>
 
                 <p className="song-card-lyrics">{order.prompt_preview}</p>
@@ -279,15 +306,17 @@ export function MySongsModal({ account, onClose }: { account: ReturnType<typeof 
                     {order.versions.map((version, index) => (
                       <div className="song-card-audio" key={`${version.label}-${index}`}>
                         {version.label && order.versions.length > 1 && (
-                          <span className="song-card-version-label">גרסה {version.label}</span>
+                          <span className="song-card-version-label">
+                            {locale === "en" ? `Version ${version.label}` : `גרסה ${version.label}`}
+                          </span>
                         )}
                         {version.audioSignedUrl && (
                           <>
                             <audio controls src={version.audioSignedUrl}>
-                              הדפדפן שלך לא תומך בנגן אודיו.
+                              {locale === "en" ? "Your browser doesn’t support the audio player." : "הדפדפן שלך לא תומך בנגן אודיו."}
                             </audio>
                             <a download href={version.audioSignedUrl}>
-                              הורדה
+                              {locale === "en" ? "Download" : "הורדה"}
                             </a>
                           </>
                         )}
@@ -296,12 +325,19 @@ export function MySongsModal({ account, onClose }: { account: ReturnType<typeof 
                   </div>
                 ) : (
                   <p className="song-card-pending">
-                    {order.status === "lyrics_ready" ? "מילים בלבד — אין קובץ אודיו שמור" : "אודיו לא זמין"}
+                    {locale === "en"
+                      ? order.status === "lyrics_ready"
+                        ? "Lyrics only — no audio file saved"
+                        : "Audio not available"
+                      : order.status === "lyrics_ready"
+                        ? "מילים בלבד — אין קובץ אודיו שמור"
+                        : "אודיו לא זמין"}
                   </p>
                 )}
 
                 <ExtraVersionButton
                   accessToken={accessToken}
+                  locale={locale}
                   onCreated={() => loadOrders()}
                   order={order}
                   refreshCredits={() => void account.refreshCredits()}
@@ -309,6 +345,7 @@ export function MySongsModal({ account, onClose }: { account: ReturnType<typeof 
 
                 <PostcardControls
                   accessToken={accessToken}
+                  locale={locale}
                   onCreated={(shareToken, photoUrl) => applyPostcard(order.id, shareToken, photoUrl)}
                   order={order}
                 />
