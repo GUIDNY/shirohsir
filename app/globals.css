@@ -3993,6 +3993,53 @@ textarea:focus {
   white-space: pre-line;
 }
 
+/* ---- /en order flow (LTR overrides only) ----
+   Additive-only, scoped entirely under .en-order-page (the root class on
+   app/en/EnglishOrderPage.tsx's <main>). Every rule below targets a class
+   that reads visibly wrong once dir flips from rtl to ltr; nothing here
+   edits an existing selector, so the Hebrew order tool at app/page.tsx
+   (which never gets this class) is completely unaffected. */
+
+.en-order-page {
+  direction: ltr;
+}
+
+/* ArrowLeft is drawn pointing left, which reads correctly as "forward"
+   in the Hebrew (RTL) flow's "next step" buttons. In LTR, "forward"
+   points right, so instances of that icon used as a forward/continue
+   indicator get mirrored here rather than swapped for a different icon
+   component (keeps this file's icon imports identical to ../page.tsx's). */
+.en-order-page .icon-flip-ltr {
+  display: inline-flex;
+  transform: scaleX(-1);
+}
+
+/* .trust-strip (hero "why choose us" facts) is centered by its grid, but
+   the Hebrew stylesheet right-aligns the text inside each fact — wrong
+   reading direction for English body copy. */
+.en-order-page .trust-strip {
+  text-align: left;
+}
+
+/* .melody-disclaimer draws a decorative rule on the side the quote
+   "hangs" from — border-right/padding-right in the Hebrew (RTL) layout,
+   which needs to be the left side once the page reads left-to-right. */
+.en-order-page .melody-disclaimer {
+  padding-right: 0;
+  padding-left: 10px;
+  border-right: none;
+  border-left: 2px solid var(--cream-300);
+}
+
+/* Mobile .type-card layout (icon + text side by side) right-aligns its
+   text for RTL; English copy in the same 2-column layout needs the text
+   left-aligned next to the icon instead. */
+@media (max-width: 640px) {
+  .en-order-page .type-card {
+    text-align: left;
+  }
+}
+
 .postcard-cta {
   color: var(--burgundy-700);
   font-weight: 700;
