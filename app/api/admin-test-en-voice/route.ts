@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getUserFromRequest } from "@/lib/auth-user";
 import { isAdminUser } from "@/lib/is-admin";
+import { elevenLabsApiKey } from "@/lib/song-generation";
 
 // TEMPORARY diagnostic route — validates whether ElevenLabs Music v2 can
 // actually sing intelligible English before any English-flow code is built
@@ -12,32 +13,10 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "forbidden" }, { status: 403 });
   }
 
-  const apiKey = process.env.ELEVENLABS_API_KEY || "";
+  const apiKey = elevenLabsApiKey();
 
   if (!apiKey) {
     return NextResponse.json({ error: "missing_elevenlabs_api_key" }, { status: 500 });
-  }
-
-  let firstBadCharIndex = -1;
-  let firstBadCharCode = 0;
-
-  for (let i = 0; i < apiKey.length; i++) {
-    if (apiKey.charCodeAt(i) > 255) {
-      firstBadCharIndex = i;
-      firstBadCharCode = apiKey.charCodeAt(i);
-      break;
-    }
-  }
-
-  console.error(
-    `[EN_VOICE_TEST_DIAG] apiKeyLength=${apiKey.length} firstBadCharIndex=${firstBadCharIndex} firstBadCharCode=${firstBadCharCode} trimmedLength=${apiKey.trim().length}`,
-  );
-
-  if (firstBadCharIndex >= 0) {
-    return NextResponse.json(
-      { error: "api_key_has_non_latin1_char", index: firstBadCharIndex, code: firstBadCharCode, length: apiKey.length },
-      { status: 500 },
-    );
   }
 
   const lyrics = `[Verse]
