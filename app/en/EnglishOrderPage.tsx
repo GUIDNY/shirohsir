@@ -926,10 +926,11 @@ export function EnglishOrderPage() {
         homeHref="/en#top"
         navLinks={[
           { href: "/en#how", label: "How it works" },
-          { href: "/pricing", label: "Pricing" },
+          { href: "/en#pricing", label: "Pricing" },
           { href: "/en#legal", label: "What's allowed" },
-          { href: "/", label: "עברית" },
         ]}
+        navAriaLabel="Main navigation"
+        newSongLabel="New Song"
         onNewSong={() => {
           startNewOrder();
           goToSection("order");
@@ -1979,18 +1980,9 @@ export function EnglishOrderPage() {
         </div>
       </section>
 
-      <section className="en-legal-links">
-        <h2>Policies</h2>
-        <p>
-          <Link href="/terms#english-version">Terms of Service</Link> ·{" "}
-          <Link href="/privacy#english-version">Privacy Policy</Link> ·{" "}
-          <Link href="/refund-policy#english-version">Refund Policy</Link>
-        </p>
-      </section>
-
       <JsonLd data={englishServiceJsonLd} />
 
-      <SiteFooter />
+      <SiteFooter locale="en" />
 
       <a className="scroll-top-fab" href="#top" aria-label="Back to top">
         <ArrowUp size={20} />

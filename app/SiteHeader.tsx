@@ -18,15 +18,23 @@ export function SiteHeader({
   navLinks,
   onNewSong,
   adminSlot,
+  navAriaLabel = "ניווט ראשי",
+  newSongLabel = "שיר חדש",
 }: {
   account: ReturnType<typeof useAccount>;
   homeHref?: string;
   navLinks: NavLink[];
   onNewSong: () => void;
   adminSlot?: ReactNode;
+  // Optional locale overrides — default to Hebrew so every existing
+  // caller (all of them, today) renders byte-identical to before these
+  // props existed. Used by the English order flow to avoid any Hebrew
+  // text/aria-label appearing on that page.
+  navAriaLabel?: string;
+  newSongLabel?: string;
 }) {
   return (
-    <nav className="topbar" aria-label="ניווט ראשי">
+    <nav className="topbar" aria-label={navAriaLabel}>
       <div className="topbar-start">
         <Link className="brand" href={homeHref} aria-label="Shirli">
           <span className="brand-mark">
@@ -47,7 +55,7 @@ export function SiteHeader({
         {adminSlot}
         <button className="nav-cta" type="button" onClick={onNewSong}>
           <Plus size={16} />
-          שיר חדש
+          {newSongLabel}
         </button>
         <AccountPanel account={account} />
       </div>
