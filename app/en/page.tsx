@@ -31,6 +31,16 @@ export const metadata: Metadata = {
     locale: "en_US",
     images: ["/og.png"],
   },
+  // Without this, the root layout's Hebrew twitter card metadata leaks
+  // through onto this page — Next.js metadata doesn't deep-merge, but a
+  // page-level `metadata` export also doesn't inherit siblings it omits
+  // the way one might expect, so this needs its own explicit block.
+  twitter: {
+    card: "summary_large_image",
+    title,
+    description,
+    images: ["/og.png"],
+  },
 };
 
 export default function Page() {
