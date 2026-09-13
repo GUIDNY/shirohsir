@@ -377,6 +377,18 @@ const englishServiceJsonLd = {
   },
 };
 
+// Display-only estimate for English visitors — the actual charge and
+// currency are determined by Lemon Squeezy's checkout page itself, which
+// detects the visitor's location and displays/charges in their local
+// currency at the live rate (see lib/lemonsqueezy-catalog.ts). This is
+// just so the pricing SECTION on this page doesn't show a raw ₪ figure
+// to someone who has no sense of what a shekel is worth.
+const USD_DISPLAY_RATE = 3.7;
+
+function formatUsdApprox(priceIls: number) {
+  return `$${Math.round(priceIls / USD_DISPLAY_RATE)}`;
+}
+
 const numberFormatter = new Intl.NumberFormat("en-US");
 
 function formatNumber(value: number | undefined) {
@@ -1868,21 +1880,22 @@ export function EnglishOrderPage() {
       <section className="en-pricing" id="pricing">
         <h2>Pricing</h2>
         <p className="en-pricing-note">
-          {CREDITS_PER_SONG} credits = one full song (two audio versions, up to 3 minutes each). Prices are set in ₪
-          (ILS); Lemon Squeezy checkout displays and charges in your local currency at checkout.
+          {CREDITS_PER_SONG} credits = one full song (two audio versions, up to 3 minutes each). Prices below are an
+          approximate USD estimate — checkout itself shows and charges you in your own local currency at the live
+          rate, wherever you are.
         </p>
 
         <div className="en-pricing-grid">
           <div className="en-pricing-card">
             <h3>Single song</h3>
-            <div className="en-pricing-price">₪{singleSongPlan.priceIls}</div>
+            <div className="en-pricing-price">{formatUsdApprox(singleSongPlan.priceIls)}</div>
             <p>{singleSongPlan.credits} credits, one-time purchase.</p>
           </div>
 
           {creditPacks.map((pack) => (
             <div className="en-pricing-card" key={pack.id}>
               <h3>{PACK_NAMES_EN[pack.id] ?? pack.name}</h3>
-              <div className="en-pricing-price">₪{pack.priceIls}</div>
+              <div className="en-pricing-price">{formatUsdApprox(pack.priceIls)}</div>
               <p>{pack.credits} credits, one-time purchase, never expires.</p>
             </div>
           ))}
@@ -1894,7 +1907,7 @@ export function EnglishOrderPage() {
             <div className="en-pricing-card" key={plan.id}>
               <h3>{PLAN_NAMES_EN[plan.id] ?? plan.name}</h3>
               <div className="en-pricing-price">
-                ₪{plan.priceIls}
+                {formatUsdApprox(plan.priceIls)}
                 <span>/mo</span>
               </div>
               <p>{plan.credits} credits per month, cancel anytime.</p>
