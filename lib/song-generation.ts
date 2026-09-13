@@ -31,6 +31,10 @@ export type OrderContent = {
   mustInclude?: string;
   avoid?: string;
   recipientGender?: "male" | "female";
+  // Which lyric-writing/ElevenLabs pipeline to use — defaults to "he"
+  // everywhere it's omitted, so every existing Hebrew call site (all
+  // current traffic) is completely unaffected by its presence.
+  language?: "he" | "en";
   // Customer-supplied finished lyrics, used verbatim instead of writing
   // lyrics from `story` — see getHebrewLyrics().
   customLyrics?: string;
@@ -347,6 +351,86 @@ export function inferSongAttributes(input: StoryInput): InferredAttributes {
   };
 }
 
+// ---- English sibling of the inference above --------------------------
+//
+// English chip values are already English, so unlike the Hebrew side
+// (which maps a Hebrew chip word to a Hebrew dictionary key, then looks
+// that key up again in styleDirections/languageDirections via
+// directionFor()), these return the final ElevenLabs-facing English
+// prose directly. directionFor()'s existing fallback (map[key] || key)
+// means passing this prose through as order.style/order.mood/etc. in
+// createSongVersion() works unchanged — it just won't match a Hebrew
+// dictionary key, and falls through to the value itself.
+
+const MOOD_CHIP_DIRECTIONS_EN: Record<string, string> = {
+  moved: "moving and sincere, warm emotional delivery",
+  funny: "playful, witty, light-hearted, fun energy",
+  romantic: "romantic, tender, intimate love-song feeling",
+  happy: "happy, upbeat, celebratory energy",
+  upbeat: "rhythmic, danceable, driving groove",
+};
+
+function combineMoodDirectionEn(moods: string[] | undefined): string {
+  const picked = (moods ?? []).filter((mood) => MOOD_CHIP_DIRECTIONS_EN[mood]);
+
+  if (picked.length === 0) {
+    return "moving and sincere, but not sad or heavy";
+  }
+
+  return picked.map((mood) => MOOD_CHIP_DIRECTIONS_EN[mood]).join(", combined with ");
+}
+
+function inferStyleEn(occasion: string, moods: string[], songType: string | undefined): string {
+  if (songType === "business") {
+    return "Compact advertising jingle, immediate melodic hook, clear brand name, bright instruments, 110-128 BPM.";
+  }
+
+  if (/wedding|love|engagement/i.test(occasion) || moods.includes("romantic")) {
+    return "Gentle, warm contemporary pop ballad, nylon guitar or piano, tasteful and sincere, 96-112 BPM.";
+  }
+
+  if (/farewell|goodbye/i.test(occasion)) {
+    return "Emotional pop ballad, piano and acoustic guitar, gradual lift, intimate vocal, 72-86 BPM.";
+  }
+
+  if (/family/i.test(occasion)) {
+    return "Warm acoustic arrangement, nylon guitar, soft percussion, close vocal, natural family-event feeling, 82-98 BPM.";
+  }
+
+  if (moods.includes("upbeat")) {
+    return "Light pop/hip-hop hybrid, conversational flow, clean beat, catchy sung hook, 88-100 BPM.";
+  }
+
+  return "Contemporary American pop, warm piano/guitar, light electronic drums, polished radio feel, 92-108 BPM.";
+}
+
+function inferLyricStructureEn(occasion: string, songType: string | undefined): "heartfelt-personal" | "opening-chorus" | "verse-chorus" {
+  if (songType === "graduation" || /farewell|goodbye|friend/i.test(occasion)) {
+    return "heartfelt-personal";
+  }
+
+  if (/business/i.test(occasion) && songType !== "business") {
+    return "opening-chorus";
+  }
+
+  return "verse-chorus";
+}
+
+export function inferSongAttributesEn(input: StoryInput): InferredAttributes {
+  const occasion = text(input.occasion);
+  const moods = input.moods ?? [];
+
+  return {
+    style: inferStyleEn(occasion, moods, input.songType),
+    mood: combineMoodDirectionEn(moods),
+    vocalist: "warm, natural, contemporary American vocal tone — gender and character chosen to fit the emotional context, not specified by the customer",
+    languageRegister: /wedding|business/i.test(occasion)
+      ? "Use polished, festive English that still sounds singable and contemporary."
+      : "Use natural, contemporary American English, like people actually speak.",
+    lyricStructure: inferLyricStructureEn(occasion, input.songType),
+  };
+}
+
 // Every 2nd-person reference below uses the "עליך/עלייך"-family of
 // prepositions (which differ in spelling by gender — an extra י for
 // feminine) instead of plain ־ך-suffixed forms like לך/איתך/שלך/אותך,
@@ -447,6 +531,139 @@ export function buildHebrewLyrics(order: OrderContent, songSeconds = 20) {
 
   return extendForLength(
     ["[Verse]", isFemale ? `${subject}, היום הזה זורח עלייך` : `${subject}, היום הזה זורח עליך`, `${detail}`, ...chorusBlock],
+    chorusBlock,
+    songSeconds,
+    elaboration,
+    bridge,
+  );
+}
+
+function subjectForLyricsEn(order: OrderContent) {
+  return line(text(order.pronunciation) || text(order.recipient), "someone special");
+}
+
+function occasionHookEn(order: OrderContent) {
+  const occasion = text(order.occasion);
+
+  if (/birthday/i.test(occasion)) {
+    return "happy birthday";
+  }
+
+  if (/wedding|love|engagement/i.test(occasion)) {
+    return "here's to love";
+  }
+
+  if (/graduation|school/i.test(occasion)) {
+    return "what a year it's been";
+  }
+
+  if (/business|brand|campaign/i.test(occasion)) {
+    return "this is the name to remember";
+  }
+
+  if (/family/i.test(occasion)) {
+    return "our family, together";
+  }
+
+  if (/friend/i.test(occasion)) {
+    return "this friendship means everything";
+  }
+
+  if (/farewell|goodbye/i.test(occasion)) {
+    return "the road goes on from here";
+  }
+
+  return line(occasion, "this moment");
+}
+
+function firstSentenceEn(value: unknown) {
+  const clean = text(value).replace(/\s+/g, " ");
+  const [sentence] = clean.split(/[.!?\n]/);
+
+  return line(sentence, "there's a little story everyone remembers");
+}
+
+function secondSentenceEn(value: unknown) {
+  const clean = text(value).replace(/\s+/g, " ");
+  const sentences = clean
+    .split(/[.!?\n]/)
+    .map((s) => s.trim())
+    .filter(Boolean);
+  const candidate = sentences[1];
+
+  return candidate ? line(candidate) : "";
+}
+
+function mustIncludeLineEn(order: OrderContent) {
+  const include = text(order.mustInclude);
+
+  return include ? line(include) : "";
+}
+
+// English fallback template — mirrors buildHebrewLyrics()'s structural
+// pattern (reuses the same language-neutral extendForLength()) but with
+// English phrasing throughout and no gendered-suffix handling, which
+// doesn't apply to English "you". Rarely hit in practice: getEnglishLyrics()
+// only falls back to this when Gemini is unavailable or its response fails
+// the shape check, exactly like the Hebrew path.
+export function buildEnglishLyrics(order: OrderContent, songSeconds = 20) {
+  const subject = subjectForLyricsEn(order);
+  const hook = occasionHookEn(order);
+  const detail = firstSentenceEn(order.story);
+  const include = mustIncludeLineEn(order);
+  const elaboration = secondSentenceEn(order.story) || "these moments stay with us always";
+  const bridge = "one more song, one more reason to smile";
+
+  if (order.songType === "business") {
+    const hookBlock = ["[Hook]", `${subject}, ${hook}`, include || "easy to remember, nice to hear"];
+
+    return extendForLength([...hookBlock, "[Verse]", `${detail}`, ...hookBlock], hookBlock, songSeconds, elaboration, bridge);
+  }
+
+  if (order.songType === "graduation") {
+    const chorusBlock = ["[Chorus]", include || "every small step became a memory", "singing out loud, with a full heart", `${subject}, this day is ours`];
+
+    return extendForLength(
+      ["[Verse]", `${hook}, all of us here together`, `${detail}`, ...chorusBlock],
+      chorusBlock,
+      songSeconds,
+      elaboration,
+      bridge,
+    );
+  }
+
+  if (order.lyricStructure === "opening-chorus") {
+    const chorusBlock = ["[Chorus]", `${hook}, ${subject}`, include || "our hearts are singing for you"];
+
+    return extendForLength([...chorusBlock, "[Verse]", `${detail}`, ...chorusBlock], chorusBlock, songSeconds, elaboration, bridge);
+  }
+
+  if (order.lyricStructure === "heartfelt-personal") {
+    const chorusBlock = [
+      "[Chorus]",
+      include || "may the light lead you all the way",
+      `${hook}, with all my heart`,
+      "this song is for you",
+    ];
+
+    return extendForLength(
+      ["[Verse]", `${subject}, today we're thinking of you`, `${detail}`, ...chorusBlock],
+      chorusBlock,
+      songSeconds,
+      elaboration,
+      bridge,
+    );
+  }
+
+  const chorusBlock = [
+    "[Chorus]",
+    include || `${hook}, singing from the heart`,
+    "a small moment turns into a song",
+    `${subject}, you'll always remember this day`,
+  ];
+
+  return extendForLength(
+    ["[Verse]", `${subject}, this day shines on you`, `${detail}`, ...chorusBlock],
     chorusBlock,
     songSeconds,
     elaboration,
@@ -584,6 +801,111 @@ async function generateLyricsWithGemini(order: OrderContent, songSeconds: number
     console.error("[GEMINI_LYRICS_FALLBACK] request failed", err instanceof Error ? err.message : err);
     return null;
   }
+}
+
+function lyricsStructureHintEn(songSeconds: number) {
+  if (songSeconds > 140) {
+    return "6 sections total: [Verse] then [Chorus], then a second [Verse] then [Chorus] again, and finally a short [Bridge] and one last [Chorus].";
+  }
+
+  if (songSeconds > 60) {
+    return "4 sections total: [Verse] then [Chorus], then one more [Verse] then [Chorus] again.";
+  }
+
+  return "2 sections only: one short [Verse] and one short [Chorus].";
+}
+
+// English sibling of generateLyricsWithGemini() — same call pattern, same
+// failure handling (any problem returns null so the caller falls back to
+// buildEnglishLyrics()), but no gendered-suffix instruction: English
+// "you" isn't grammatically gendered, so that whole problem (and
+// addNiqqud()'s corresponding fix-up pass) simply doesn't apply here.
+async function generateEnglishLyricsWithGemini(order: OrderContent, songSeconds: number): Promise<string | null> {
+  const apiKey = geminiApiKey();
+
+  if (!apiKey) {
+    return null;
+  }
+
+  const prompt = [
+    "Write lyrics for a personal pop song in English, based on the following details:",
+    `- Dedicated to: ${text(order.pronunciation) || text(order.recipient) || "this special person"}`,
+    `- Occasion: ${text(order.occasion) || "a special moment"}`,
+    `- Personal story/details to include: ${text(order.story) || "no further details, use the general mood of the occasion"}`,
+    text(order.mustInclude) ? `- Must be naturally worked into the lyrics: ${text(order.mustInclude)}` : "",
+    text(order.avoid) ? `- Must never be mentioned or implied: ${text(order.avoid)}` : "",
+    `- Required structure: ${lyricsStructureHintEn(songSeconds)}`,
+    "- The verse(s) must be built from concrete, specific details from the story provided — names, places, actions, inside jokes — not generic description that could fit anyone. If the story has more than one distinct detail, spread them across different verses rather than repeating the same one.",
+    "- Avoid worn-out phrases like \"with all my heart,\" \"this little moment becomes a song,\" \"today is so special,\" \"made for you\" — find original, specific phrasing for this person and this story.",
+    "- Natural, contemporary American English, singable, rhyme where it comes naturally without forcing awkward phrasing. No Hebrew words and no gibberish.",
+    "- Mark every section on its own line: [Verse] / [Chorus] / [Bridge].",
+    "- Return only the lyrics with their tags — no title, no explanation, no quotation marks.",
+  ]
+    .filter(Boolean)
+    .join("\n");
+
+  try {
+    const response = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${apiKey}`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          contents: [{ parts: [{ text: prompt }] }],
+          generationConfig: { thinkingConfig: { thinkingBudget: 0 } },
+        }),
+        signal: AbortSignal.timeout(12000),
+      },
+    );
+
+    if (!response.ok) {
+      console.error(`[GEMINI_LYRICS_EN_FALLBACK] http ${response.status}`);
+      return null;
+    }
+
+    const data = (await response.json()) as {
+      candidates?: Array<{ content?: { parts?: Array<{ text?: string }> } }>;
+    };
+    const raw = data.candidates?.[0]?.content?.parts?.[0]?.text;
+
+    if (!raw) {
+      console.error("[GEMINI_LYRICS_EN_FALLBACK] empty response");
+      return null;
+    }
+
+    const cleaned = raw.trim();
+
+    if (!/\[Verse\]/i.test(cleaned) || !/\[Chorus\]/i.test(cleaned) || cleaned.length < 20 || cleaned.length > 2000) {
+      console.error("[GEMINI_LYRICS_EN_FALLBACK] malformed response shape");
+      return null;
+    }
+
+    return cleaned;
+  } catch (err) {
+    console.error("[GEMINI_LYRICS_EN_FALLBACK] request failed", err instanceof Error ? err.message : err);
+    return null;
+  }
+}
+
+// English sibling of getHebrewLyrics() — same custom-lyrics-first, then
+// Gemini, then template fallback order.
+export async function getEnglishLyrics(order: OrderContent, songSeconds = 20): Promise<string> {
+  const customLyrics = customLyricsText(order.customLyrics);
+
+  if (customLyrics) {
+    return customLyrics;
+  }
+
+  const aiLyrics = await generateEnglishLyricsWithGemini(order, songSeconds);
+
+  return aiLyrics ?? buildEnglishLyrics(order, songSeconds);
+}
+
+// Single dispatcher createSongVersion() and preview-lyrics use instead of
+// calling getHebrewLyrics()/getEnglishLyrics() directly — keeps the
+// language switch in exactly one place.
+export async function getLyrics(order: OrderContent, songSeconds = 20): Promise<string> {
+  return order.language === "en" ? getEnglishLyrics(order, songSeconds) : getHebrewLyrics(order, songSeconds);
 }
 
 // Single entry point every caller should use to get lyrics text: real
@@ -1051,14 +1373,17 @@ export async function createSongVersion(order: OrderContent, songSeconds: number
     `https://api.elevenlabs.io/v1/music/stream?output_format=${encodeURIComponent(outputFormat)}`;
   const musicLengthMs = songSeconds * 1000;
   const modelId = process.env.ELEVENLABS_MUSIC_MODEL_ID || "music_v2";
-  const lyrics = await getHebrewLyrics(order, songSeconds);
+  const isEnglish = order.language === "en";
+  const lyrics = await getLyrics(order, songSeconds);
   const positiveStyles = [
     directionFor(styleDirections, order.style),
     directionFor(moodDirections, order.mood),
     directionFor(vocalistDirections, order.vocalist),
     directionFor(languageDirections, order.languageRegister),
-    "clear modern Israeli Hebrew pronunciation",
-    "short singable Hebrew lines",
+    isEnglish
+      ? "clear, natural American English pronunciation, fully intelligible sung lyrics"
+      : "clear modern Israeli Hebrew pronunciation",
+    isEnglish ? "short, singable English lines" : "short singable Hebrew lines",
     songSeconds <= 20 ? "compact 20 second song with immediate vocals" : "full arrangement with intro, verse, chorus and outro",
   ];
   const inspiration = text(order.inspiration);
@@ -1070,15 +1395,26 @@ export async function createSongVersion(order: OrderContent, songSeconds: number
     positiveStyles.push(`general musical feel inspired by ${inspiration}, as an original composition`);
   }
 
-  const negativeStyles = [
-    "gibberish Hebrew",
-    "transliterated Hebrew",
-    "English lyrics",
-    "fake Hebrew words",
-    "overly dramatic AI poetry",
-    "imitating a known artist",
-    "long instrumental intro",
-  ];
+  const negativeStyles = isEnglish
+    ? [
+        "Hebrew lyrics",
+        "gibberish or nonsense English",
+        "fake or made-up words",
+        "mixed languages",
+        "heavy accent obscuring the words",
+        "overly dramatic AI poetry",
+        "imitating a known artist",
+        "long instrumental intro",
+      ]
+    : [
+        "gibberish Hebrew",
+        "transliterated Hebrew",
+        "English lyrics",
+        "fake Hebrew words",
+        "overly dramatic AI poetry",
+        "imitating a known artist",
+        "long instrumental intro",
+      ];
 
   if (!apiKey) {
     return {
@@ -1095,8 +1431,11 @@ export async function createSongVersion(order: OrderContent, songSeconds: number
   // Dicta's Nakdan (a free, established Hebrew diacritization service) adds
   // niqqud before we hand the lyrics to ElevenLabs. Falls back to the plain
   // text line-by-line on any failure, so a slow/unreachable Nakdan never
-  // blocks or breaks song generation.
-  const vocalizedLyrics = await addNiqqud(lyrics, order.recipientGender === "female");
+  // blocks or breaks song generation. Skipped outright for English — not
+  // just relying on addNiqqud()'s own no-Hebrew-letters no-op guard —
+  // since it's a real external API call that's meaningless for English
+  // text and would otherwise fire on every line for no reason.
+  const vocalizedLyrics = isEnglish ? lyrics : await addNiqqud(lyrics, order.recipientGender === "female");
 
   // "יש לי הקלטה להשראה" — steers the generation's sound/production/tempo
   // toward the customer's uploaded reference (see uploadAudioReference()).

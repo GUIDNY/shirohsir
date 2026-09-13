@@ -12,6 +12,7 @@ import {
   fetchElevenLabsQuota,
   GeneratedVersion,
   inferSongAttributes,
+  inferSongAttributesEn,
   MusicProviderError,
   OrderContent,
   text,
@@ -101,6 +102,7 @@ function orderInsertRow(
     song_length_seconds: songSeconds,
     credits_cost: creditsCost,
     recipient_gender: order.recipientGender === "female" ? "female" : "male",
+    language: order.language === "en" ? "en" : "he",
   };
 }
 
@@ -136,7 +138,7 @@ export async function POST(request: NextRequest) {
   // The customer only gave us an occasion + up to 2 mood chips + free text —
   // fill in the style/mood/vocalist/language/structure attributes the
   // existing lyric-writing and ElevenLabs pipeline expects.
-  const inferred = inferSongAttributes({
+  const inferred = (order.language === "en" ? inferSongAttributesEn : inferSongAttributes)({
     songType: order.songType,
     occasion: order.occasion,
     moods: order.moods,
@@ -145,6 +147,7 @@ export async function POST(request: NextRequest) {
   const enrichedOrder: OrderPayload = {
     ...order,
     ...inferred,
+    language: order.language === "en" ? "en" : "he",
     recipientGender: order.recipientGender === "female" ? "female" : "male",
     audioReference:
       order.musicMode === "reference" && order.audioReference?.songId
@@ -309,6 +312,7 @@ export async function POST(request: NextRequest) {
       customerName: text(enrichedOrder.customerName),
       recipient: text(enrichedOrder.recipient),
       occasion: text(enrichedOrder.occasion),
+      language: enrichedOrder.language,
     }).catch(() => {});
 
     return NextResponse.json({

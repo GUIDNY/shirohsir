@@ -36,7 +36,7 @@ export async function POST(request: NextRequest, ctx: RouteContext<"/api/orders/
   const { data: order } = await supabase
     .from("orders")
     .select(
-      "id, user_id, song_type, recipient, occasion, style, mood, vocalist, language_register, lyric_structure, pronunciation, story, must_include, avoid, song_length_seconds, recipient_gender, custom_lyrics, inspiration, music_mode, melody_song_id, melody_condition_strength",
+      "id, user_id, song_type, recipient, occasion, style, mood, vocalist, language_register, lyric_structure, pronunciation, story, must_include, avoid, song_length_seconds, recipient_gender, custom_lyrics, inspiration, music_mode, melody_song_id, melody_condition_strength, language",
     )
     .eq("id", orderId)
     .maybeSingle();
@@ -84,6 +84,7 @@ export async function POST(request: NextRequest, ctx: RouteContext<"/api/orders/
     recipientGender,
     customLyrics: order.custom_lyrics || "",
     inspiration: order.inspiration || "",
+    language: (order.language === "en" ? "en" : "he") as "he" | "en",
     audioReference:
       order.music_mode === "reference" && order.melody_song_id
         ? ({ songId: order.melody_song_id, conditionStrength: (order.melody_condition_strength || "high") as ConditionStrength } satisfies AudioReference)

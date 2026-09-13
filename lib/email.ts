@@ -4,7 +4,7 @@
 // password reset), which are configured in the Supabase dashboard, not
 // here.
 
-import { SITE_NAME_HE, SITE_URL } from "./site-config";
+import { SITE_NAME, SITE_NAME_HE, SITE_URL } from "./site-config";
 
 const FROM_ADDRESS = `Shirli <noreply@myshirli.com>`;
 
@@ -42,16 +42,21 @@ async function sendEmail(to: string, subject: string, html: string): Promise<boo
   }
 }
 
-function emailShell(bodyHtml: string): string {
+function emailShell(bodyHtml: string, language: "he" | "en" = "he"): string {
+  const isEnglish = language === "en";
+  const footerText = isEnglish
+    ? `Sent by ${SITE_NAME} · <a href="${SITE_URL}" style="color:#6d3bd7;">${SITE_URL.replace("https://", "")}</a>`
+    : `המייל נשלח מ-${SITE_NAME_HE} · <a href="${SITE_URL}" style="color:#6d3bd7;">${SITE_URL.replace("https://", "")}</a>`;
+
   return `
-    <div dir="rtl" style="font-family: Arial, Helvetica, sans-serif; background:#fdf8ff; padding:32px 16px;">
+    <div dir="${isEnglish ? "ltr" : "rtl"}" style="font-family: Arial, Helvetica, sans-serif; background:#fdf8ff; padding:32px 16px;">
       <div style="max-width:480px; margin:0 auto; background:#ffffff; border-radius:18px; padding:32px 28px; border:1px solid #ede7f3;">
         <div style="text-align:center; margin-bottom:24px; font-size:22px; font-weight:700; background:linear-gradient(90deg,#6d3bd7,#4a1fa8); -webkit-background-clip:text; background-clip:text; color:transparent;">
-          ${SITE_NAME_HE}
+          ${isEnglish ? SITE_NAME : SITE_NAME_HE}
         </div>
         ${bodyHtml}
         <div style="margin-top:28px; padding-top:16px; border-top:1px solid #ede7f3; color:#8a8393; font-size:12px; text-align:center;">
-          המייל נשלח מ-${SITE_NAME_HE} · <a href="${SITE_URL}" style="color:#6d3bd7;">${SITE_URL.replace("https://", "")}</a>
+          ${footerText}
         </div>
       </div>
     </div>
@@ -68,8 +73,29 @@ export async function sendOrderReadyEmail(params: {
   customerName: string;
   recipient: string;
   occasion: string;
+  language?: "he" | "en";
 }): Promise<boolean> {
-  const { to, customerName, recipient, occasion } = params;
+  const { to, customerName, recipient, occasion, language = "he" } = params;
+
+  if (language === "en") {
+    const html = emailShell(
+      `
+      <p style="font-size:16px; color:#1c1b1f; line-height:1.6;">Hi ${escapeHtml(customerName)},</p>
+      <p style="font-size:16px; color:#1c1b1f; line-height:1.6;">
+        The song for <strong>${escapeHtml(recipient)}</strong> (${escapeHtml(occasion)}) is ready! Both versions are waiting
+        in your account — listen, download, and share.
+      </p>
+      <div style="text-align:center; margin:28px 0;">
+        <a href="${SITE_URL}/en#order" style="display:inline-block; background:linear-gradient(90deg,#6d3bd7,#340080); color:#fdf8ff; text-decoration:none; padding:14px 28px; border-radius:999px; font-weight:700;">
+          View my song
+        </a>
+      </div>
+    `,
+      "en",
+    );
+
+    return sendEmail(to, `${recipient}'s song is ready 🎵`, html);
+  }
 
   const html = emailShell(`
     <p style="font-size:16px; color:#1c1b1f; line-height:1.6;">היי ${escapeHtml(customerName)},</p>

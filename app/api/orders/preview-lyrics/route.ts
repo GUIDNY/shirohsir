@@ -1,7 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getUserFromRequest } from "@/lib/auth-user";
 import { MAX_VERSION_SECONDS, SONG_LENGTH_OPTIONS } from "@/lib/pricing-catalog";
-import { addNiqqud, customLyricsText, getHebrewLyrics, inferSongAttributes, OrderContent, text } from "@/lib/song-generation";
+import {
+  addNiqqud,
+  customLyricsText,
+  getLyrics,
+  inferSongAttributes,
+  inferSongAttributesEn,
+  OrderContent,
+  text,
+} from "@/lib/song-generation";
 
 type PreviewPayload = OrderContent & {
   moods?: string[];
@@ -27,7 +35,8 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "צריך להתחבר לפני יצירת שיר" }, { status: 401 });
   }
 
-  const inferred = inferSongAttributes({
+  const isEnglish = order.language === "en";
+  const inferred = (isEnglish ? inferSongAttributesEn : inferSongAttributes)({
     songType: order.songType,
     occasion: order.occasion,
     moods: order.moods,
@@ -44,7 +53,8 @@ export async function POST(request: NextRequest) {
     ? (order.songLengthSeconds as number)
     : MAX_VERSION_SECONDS;
 
-  const lyrics = await addNiqqud(await getHebrewLyrics(enrichedOrder, songSeconds), enrichedOrder.recipientGender === "female");
+  const rawLyrics = await getLyrics(enrichedOrder, songSeconds);
+  const lyrics = isEnglish ? rawLyrics : await addNiqqud(rawLyrics, enrichedOrder.recipientGender === "female");
 
   return NextResponse.json({ lyrics });
 }
