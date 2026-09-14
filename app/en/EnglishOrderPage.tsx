@@ -1880,9 +1880,9 @@ export function EnglishOrderPage() {
       <section className="en-pricing" id="pricing">
         <h2>Pricing</h2>
         <p className="en-pricing-note">
-          {CREDITS_PER_SONG} credits = one full song (two audio versions, up to 3 minutes each). Prices below are an
-          approximate USD estimate — checkout itself shows and charges you in your own local currency at the live
-          rate, wherever you are.
+          {CREDITS_PER_SONG} credits = one full song (two audio versions, up to 3 minutes each). Prices below are
+          shown in USD for reference — checkout itself charges in ILS (Israeli new shekel), and your card is
+          converted automatically at your bank's standard rate, the same as any other international purchase.
         </p>
 
         <div className="en-pricing-grid">
