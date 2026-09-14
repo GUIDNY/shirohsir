@@ -372,7 +372,7 @@ const englishServiceJsonLd = {
     price: singleSongPlan.priceIls,
     priceCurrency: "ILS",
     availability: "https://schema.org/InStock",
-    url: `${SITE_URL}/pricing`,
+    url: `${SITE_URL}/en#pricing`,
   },
 };
 
