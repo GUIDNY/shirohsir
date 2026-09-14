@@ -9,7 +9,6 @@
 // logic changes — there is deliberately no shared abstraction.
 
 import { Fragment, FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
-import Link from "next/link";
 import {
   AlertTriangle,
   ArrowLeft,
@@ -1677,10 +1676,10 @@ export function EnglishOrderPage() {
                       <button onClick={() => handleSelectPlan(singleSongPlan)} type="button">
                         Buy a single song
                       </button>
-                      <button onClick={() => (window.location.href = "/pricing?tab=packs")} type="button">
+                      <button onClick={() => (window.location.href = "/en#pricing")} type="button">
                         View packs
                       </button>
-                      <button onClick={() => (window.location.href = "/pricing?tab=subscriptions")} type="button">
+                      <button onClick={() => (window.location.href = "/en#pricing")} type="button">
                         Join a subscription
                       </button>
                     </div>
@@ -1882,7 +1881,7 @@ export function EnglishOrderPage() {
         <p className="en-pricing-note">
           {CREDITS_PER_SONG} credits = one full song (two audio versions, up to 3 minutes each). Prices below are
           shown in USD for reference — checkout itself charges in ILS (Israeli new shekel), and your card is
-          converted automatically at your bank's standard rate, the same as any other international purchase.
+          converted automatically at your bank’s standard rate, the same as any other international purchase.
         </p>
 
         <div className="en-pricing-grid">
@@ -1954,20 +1953,6 @@ export function EnglishOrderPage() {
               </div>
             ))}
           </div>
-        </div>
-      </section>
-
-      <section className="pricing-cta-band">
-        <div className="pricing-cta-band-inner">
-          <div className="pricing-cta-band-copy">
-            <h3>Want to see all purchase options?</h3>
-            <p>Single song, song packs, or a monthly subscription — all prices and savings in one place.</p>
-          </div>
-          <Link className="pricing-cta-band-button" href="/pricing">
-            <Coin size={18} />
-            Go to the pricing page
-            <ArrowLeft className="icon-flip-ltr" size={16} />
-          </Link>
         </div>
       </section>
 
