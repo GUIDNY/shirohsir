@@ -544,9 +544,15 @@ export function EnglishOrderPage() {
           body: formData,
         });
 
-        const data = (await response.json().catch(() => null)) as { songId?: string; error?: string } | null;
+        const data = (await response.json().catch(() => null)) as { songId?: string; error?: string; code?: string } | null;
 
         if (!response.ok || !data?.songId) {
+          if (data?.code === "copyrighted_material") {
+            throw new Error(
+              "This sounds like an existing copyrighted song — ElevenLabs doesn’t allow uploading those as a reference. Try humming or singing an original melody instead.",
+            );
+          }
+
           throw new Error("Error uploading the recording");
         }
 

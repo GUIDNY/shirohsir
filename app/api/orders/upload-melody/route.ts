@@ -51,6 +51,22 @@ export async function POST(request: NextRequest) {
       // a generic hiccup) is diagnosable from logs rather than guessed.
       console.error(`[MELODY_UPLOAD_FAILED] user=${user.id} status=${error.providerStatus} message=${error.providerMessage}`);
 
+      // ElevenLabs rejects reference uploads it detects as an existing
+      // copyrighted recording (not an original hum/demo) — retrying the
+      // same file will never succeed, so this needs its own message
+      // rather than the generic "try again" one. `code` lets the English
+      // page show its own localized copy instead of this Hebrew text
+      // (it never displays the server's `error` string directly).
+      if (/copyrighted_material/i.test(error.providerMessage)) {
+        return NextResponse.json(
+          {
+            error: "הקובץ זוהה כהקלטה של שיר קיים/מוגן בזכויות יוצרים — ElevenLabs לא מאפשר להעלות הקלטות כאלה כהשראה. אפשר להעלות המהום/שירה מקורית משלכם במקום.",
+            code: "copyrighted_material",
+          },
+          { status: 400 },
+        );
+      }
+
       return NextResponse.json({ error: "לא הצלחנו להעלות את ההקלטה כרגע — אפשר לנסות שוב." }, { status: 502 });
     }
 
