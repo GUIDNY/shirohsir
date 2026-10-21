@@ -11,6 +11,18 @@ export const OLD_DOMAIN_HOST = "shirohsir-9xud.vercel.app";
 
 export const SUPPORT_EMAIL = "bd12123@gmail.com";
 
+// Vercel's serverless functions hard-reject any request body over 4.5MB
+// at the platform level (FUNCTION_PAYLOAD_TOO_LARGE) — this cannot be
+// configured or raised, and that rejection happens before our own API
+// route code ever runs, bypassing any server-side size check and error
+// message entirely. 4MB stays safely under that wall with headroom for
+// multipart/form-data overhead, while still covering a minute or two of
+// real voice-memo audio — comfortably more than ElevenLabs' own useful
+// reference range. Shared between the upload-melody API route (server-
+// side enforcement) and the order pages (client-side pre-check, so a
+// customer never even attempts an upload that's guaranteed to fail).
+export const MAX_MELODY_BYTES = 4 * 1024 * 1024;
+
 // Brand name as used in structured data (JSON-LD), llms.txt and
 // metadata — the Latin wordmark plus its Hebrew spelling.
 export const SITE_NAME = "Shirli";

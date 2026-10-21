@@ -46,7 +46,7 @@ import {
   SONG_LENGTH_OPTIONS,
   subscriptionPlans,
 } from "@/lib/pricing-catalog";
-import { SITE_URL } from "@/lib/site-config";
+import { MAX_MELODY_BYTES, SITE_URL } from "@/lib/site-config";
 import { useAccount } from "../useAccount";
 
 type SongType = "gift" | "business" | "graduation";
@@ -507,6 +507,17 @@ export function EnglishOrderPage() {
     async (blob: Blob, fileName: string) => {
       if (!account.session) {
         promptSignIn();
+        return;
+      }
+
+      // Checked before even attempting the upload — Vercel's platform
+      // itself hard-rejects any request body over 4.5MB before our API
+      // route ever runs, so a customer who hits that wall otherwise just
+      // sees a blank/opaque failure instead of a clear reason.
+      if (blob.size > MAX_MELODY_BYTES) {
+        setOrder((current) => ({ ...current, melodyFileName: fileName, melodySongId: null, melodyRightsConfirmed: false }));
+        setMelodyUploadStatus("error");
+        setMelodyError("That audio file is too large (max 4MB — about a minute or two of recording)");
         return;
       }
 

@@ -35,6 +35,7 @@ import {
   singleSongPlan,
   SONG_LENGTH_OPTIONS,
 } from "@/lib/pricing-catalog";
+import { MAX_MELODY_BYTES } from "@/lib/site-config";
 import { homeServiceJsonLd } from "@/lib/structured-data";
 import { useAccount } from "./useAccount";
 
@@ -423,6 +424,17 @@ export default function Home() {
     async (blob: Blob, fileName: string) => {
       if (!account.session) {
         promptSignIn();
+        return;
+      }
+
+      // Checked before even attempting the upload — Vercel's platform
+      // itself hard-rejects any request body over 4.5MB before our API
+      // route ever runs, so a customer who hits that wall otherwise just
+      // sees a blank/opaque failure instead of a clear reason.
+      if (blob.size > MAX_MELODY_BYTES) {
+        setOrder((current) => ({ ...current, melodyFileName: fileName, melodySongId: null, melodyRightsConfirmed: false }));
+        setMelodyUploadStatus("error");
+        setMelodyError("קובץ האודיו גדול מדי (מקסימום 4MB — בערך דקה-שתיים של הקלטה)");
         return;
       }
 

@@ -2,10 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getUserFromRequest } from "@/lib/auth-user";
 import { elevenLabsProvider } from "@/lib/music-providers/elevenlabs-provider";
 import { AudioReferenceUploadError } from "@/lib/song-generation";
-
-// Generous enough for ~30-60s of even uncompressed audio, small enough
-// to bound abuse of the (paid, per-call) ElevenLabs upload endpoint.
-const MAX_MELODY_BYTES = 20 * 1024 * 1024;
+import { MAX_MELODY_BYTES } from "@/lib/site-config";
 
 // Pre-flight step, separate from order submission — runs before any
 // credits are spent, so a customer finds out about an unsupported file
@@ -35,7 +32,7 @@ export async function POST(request: NextRequest) {
   }
 
   if (file.size > MAX_MELODY_BYTES) {
-    return NextResponse.json({ error: "קובץ האודיו גדול מדי (מקסימום 20MB)" }, { status: 400 });
+    return NextResponse.json({ error: "קובץ האודיו גדול מדי (מקסימום 4MB — בערך דקה-שתיים של הקלטה)" }, { status: 400 });
   }
 
   try {
